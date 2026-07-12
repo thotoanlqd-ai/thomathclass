@@ -610,3 +610,228 @@ section { padding: 64px 0; }
   .nav-links.open { display: flex; }
   .btn-azota { align-self: flex-start; }
 }
+
+/* =========================================================
+   Các lớp học — class roster, student login, dashboard, admin
+   ========================================================= */
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+@media (max-width: 860px) { .class-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .class-grid { grid-template-columns: 1fr; } }
+
+.class-card {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 26px 22px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  font-family: inherit;
+}
+.class-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--pen-red); }
+.class-card .icon-wrap {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: var(--chalk);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+}
+.class-card h3 { margin: 0 0 4px; font-size: 1.08rem; font-weight: 800; }
+.class-card p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+
+.panel {
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: var(--shadow);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.panel-head h2 { margin: 0; font-size: 1.3rem; font-weight: 800; }
+
+.back-link {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+  padding: 0;
+}
+.back-link:hover { color: var(--pen-red); }
+
+.roster-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (max-width: 560px) { .roster-list { grid-template-columns: 1fr; } }
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 13px 16px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.roster-item:hover { border-color: var(--pen-red); color: var(--pen-red); background: #fff; }
+.roster-item .arrow { color: var(--muted); font-weight: 400; }
+
+.empty-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+  padding: 20px 0;
+}
+
+/* login inline card (dùng trong modal chung) */
+.login-student-name {
+  font-weight: 700;
+  font-size: 1.02rem;
+  margin-bottom: 4px;
+}
+.field {
+  margin-bottom: 14px;
+}
+.field label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--ink);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none;
+  border-color: var(--pen-red);
+}
+.field-error { color: var(--pen-red); font-size: 0.85rem; margin-top: 6px; min-height: 1em; }
+
+/* dashboard */
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.dash-header .who { display: flex; align-items: center; gap: 14px; }
+.dash-header .avatar-sm {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--chalk); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 1.3rem;
+  border: 3px solid var(--highlight);
+}
+.dash-header h2 { margin: 0; font-size: 1.2rem; }
+.dash-header .cls { color: var(--muted); font-size: 0.88rem; }
+
+.score-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+.score-table th, .score-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--card-border);
+  font-size: 0.9rem;
+}
+.score-table th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+.score-table td.val { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--pen-red); }
+
+.comment-card {
+  border-left: 3px solid var(--highlight);
+  background: var(--paper);
+  padding: 14px 16px;
+  border-radius: 0 10px 10px 0;
+  margin-bottom: 12px;
+}
+.comment-card .date { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; display: block; }
+.comment-card p { margin: 0; font-size: 0.92rem; }
+
+.dash-section { margin-top: 28px; }
+.dash-section h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  margin: 0 0 14px;
+}
+
+/* admin */
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 900px) { .admin-grid { grid-template-columns: 1fr; } }
+
+.admin-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
+.admin-row .field { margin-bottom: 0; flex: 1; min-width: 160px; }
+
+.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.data-table th, .data-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--card-border); font-size: 0.86rem; }
+.data-table th { color: var(--muted); font-weight: 600; }
+.mini-btn {
+  border: none; background: none; cursor: pointer;
+  color: var(--pen-red); font-size: 0.8rem; font-weight: 600;
+}
+.mini-btn:hover { text-decoration: underline; }
+
+.admin-locked {
+  text-align: center;
+  padding: 60px 20px;
+}
+.admin-locked .field { max-width: 320px; margin: 0 auto 14px; text-align: left; }
+
+.badge-admin {
+  display: inline-block;
+  background: var(--highlight);
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.footer-mini-link {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.4) !important;
+}

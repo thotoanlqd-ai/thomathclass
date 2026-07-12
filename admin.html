@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Quản trị Giáo viên — ThoMathClass</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo">
+      <span class="name">Tho<span>Math</span>Class</span>
+      <span class="sub">Trang quản trị Giáo viên</span>
+    </a>
+    <div class="nav-links" style="display:flex;">
+      <a href="index.html">← Về trang chủ</a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero" style="padding-bottom:0;">
+    <div class="container">
+      <p class="eyebrow">Khu vực riêng</p>
+      <h1>Quản trị lớp học</h1>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+
+      <!-- ===== Chưa đăng nhập ===== -->
+      <div class="panel admin-locked" id="view-login">
+        <span class="badge-admin">CHỈ DÀNH CHO GIÁO VIÊN</span>
+        <h2 style="margin:0 0 18px;">Đăng nhập tài khoản Giáo viên</h2>
+        <div class="field">
+          <label for="admin-email">Email</label>
+          <input type="email" id="admin-email" placeholder="email@vidu.com" />
+        </div>
+        <div class="field">
+          <label for="admin-password">Mật khẩu</label>
+          <input type="password" id="admin-password" placeholder="Mật khẩu" />
+        </div>
+        <p class="field-error" id="admin-login-error"></p>
+        <button class="btn btn-primary" id="btn-admin-login">Đăng nhập</button>
+      </div>
+
+      <!-- ===== Đã đăng nhập, đúng admin ===== -->
+      <div id="view-admin" hidden>
+        <div class="panel-head" style="margin-bottom:20px;">
+          <h2 style="margin:0;font-size:1.4rem;">Bảng điều khiển</h2>
+          <button class="btn btn-outline btn-small" id="btn-admin-logout">Đăng xuất</button>
+        </div>
+
+        <div class="admin-grid">
+
+          <!-- Thêm học sinh -->
+          <div class="panel">
+            <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm học sinh mới</h3>
+            <div class="field">
+              <label>Lớp</label>
+              <select id="new-class"></select>
+            </div>
+            <div class="field">
+              <label>Họ tên học sinh</label>
+              <input type="text" id="new-fullname" placeholder="Vd: Nguyễn Văn A" />
+            </div>
+            <div class="field">
+              <label>Mã học sinh (dùng để đăng nhập, không dấu, không trùng)</label>
+              <input type="text" id="new-code" placeholder="Vd: 12a6-nguyenvana" />
+            </div>
+            <div class="field">
+              <label>Mật khẩu ban đầu</label>
+              <input type="text" id="new-password" placeholder="Vd: thomath2026" />
+            </div>
+            <p class="field-error" id="new-student-error"></p>
+            <button class="btn btn-primary btn-small" id="btn-add-student">Thêm học sinh</button>
+          </div>
+
+          <!-- Nhập điểm / nhận xét -->
+          <div class="panel">
+            <h3 style="margin:0 0 16px;font-size:1.05rem;">✏️ Nhập điểm &amp; nhận xét</h3>
+            <div class="admin-row">
+              <div class="field">
+                <label>Chọn lớp</label>
+                <select id="pick-class"></select>
+              </div>
+              <div class="field">
+                <label>Chọn học sinh</label>
+                <select id="pick-student"><option value="">— Chọn lớp trước —</option></select>
+              </div>
+            </div>
+
+            <div id="student-editor" hidden>
+              <h4 style="margin:18px 0 10px;font-size:0.92rem;">Thêm điểm số</h4>
+              <div class="admin-row">
+                <div class="field"><label>Nội dung</label><input type="text" id="score-label" placeholder="Vd: Kiểm tra 15' — Hàm số" /></div>
+                <div class="field" style="max-width:110px;"><label>Điểm</label><input type="text" id="score-value" placeholder="8.5" /></div>
+                <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="score-date" /></div>
+                <button class="btn btn-primary btn-small" id="btn-add-score">Thêm</button>
+              </div>
+              <table class="data-table" id="score-data-table">
+                <thead><tr><th>Nội dung</th><th>Ngày</th><th>Điểm</th><th></th></tr></thead>
+                <tbody id="score-data-body"></tbody>
+              </table>
+
+              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Thêm nhận xét</h4>
+              <div class="field">
+                <textarea id="comment-text" rows="3" placeholder="Nhận xét về học sinh..."></textarea>
+              </div>
+              <div class="admin-row">
+                <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="comment-date" /></div>
+                <button class="btn btn-primary btn-small" id="btn-add-comment">Thêm nhận xét</button>
+              </div>
+              <table class="data-table" id="comment-data-table">
+                <thead><tr><th>Ngày</th><th>Nội dung</th><th></th></tr></thead>
+                <tbody id="comment-data-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ===== Đăng nhập rồi nhưng không phải admin ===== -->
+      <div class="panel admin-locked" id="view-forbidden" hidden>
+        <h2>Tài khoản này không có quyền quản trị</h2>
+        <p style="color:var(--muted);">UID hiện tại không khớp ADMIN_UID trong firebase-config.js.</p>
+        <button class="btn btn-outline" id="btn-forbidden-logout">Đăng xuất</button>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
