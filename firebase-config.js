@@ -9,14 +9,14 @@
 //
 // TODO: thay toàn bộ giá trị "TODO_..." bên dưới bằng giá trị thật
 const firebaseConfig = {
-  apiKey: "AIzaSyDTfeIodEAPn-nfCrl-QhyZCWDMrHL9zAs",
+  apiKey: "AIzaSyDTfelodEAPn-nfCrl-QhyZCWDMrHL9zAs",
   authDomain: "thomathclass.firebaseapp.com",
   projectId: "thomathclass",
   storageBucket: "thomathclass.firebasestorage.app",
   messagingSenderId: "1076472930743",
-  appId: "1:1076472930743:web:e71646a2c10b3031e30832"
+  appId: "1:1076472930743:web:e71646a2c10b3031e30832",
+  measurementId: "G-4MCM5W0S0D"
 };
-
 // BƯỚC 2: Thầy vào Authentication > tab Users > tạo tài khoản
 // Giáo viên (email + mật khẩu của thầy) > bấm vào dòng vừa tạo
 // để xem "User UID" > dán UID đó vào đây.
