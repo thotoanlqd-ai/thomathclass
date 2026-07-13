@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bài tập trên Azota — ThoMathClass</title>
+<meta name="description" content="Các bộ bài tập trên Azota do Thầy Đỗ Quang Thọ biên soạn và giao — đăng ký để được thêm vào lớp và làm bài trực tiếp." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav">
+    <a href="index.html" class="logo">
+      <span class="name">Tho<span>Math</span>Class</span>
+      <span class="sub">Thầy Đỗ Quang Thọ · Toán THPT</span>
+    </a>
+    <button class="nav-toggle" aria-label="Mở menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links">
+      <a href="baigiang.html">Bài giảng</a>
+      <a href="tailieu.html">Tài liệu</a>
+      <a href="khoahoc.html">Khóa học online</a>
+      <a href="lophoc.html">Các lớp học</a>
+      <a href="index.html#contact">Liên hệ</a>
+      <a href="azota.html" class="btn-azota">
+        Bài tập trên Azota →
+      </a>
+    </div>
+  </nav>
+</header>
+
+<main>
+  <section class="page-hero">
+    <div class="container">
+      <p class="eyebrow">Bài tập trên Azota</p>
+      <h1>Các bộ bài tập giao trên Azota</h1>
+      <p>Mỗi bộ bài tập dưới đây được Thầy biên soạn riêng và giao trực tiếp trên Azota. Đăng ký để được Thầy thêm vào lớp Azota tương ứng và bắt đầu làm bài, theo dõi điểm số ngay sau khi nộp.</p>
+    </div>
+  </section>
+
+  <section style="padding-top:0;">
+    <div class="container">
+      <div class="filter-bar" id="filter-bar"></div>
+
+      <div class="product-grid" id="product-grid"></div>
+      <p class="empty-note" id="products-empty" hidden>Hiện chưa có bộ bài tập nào, Thầy sẽ cập nhật sớm.</p>
+
+      <div class="panel reveal" style="margin-top:32px;">
+        <h3 style="margin:0 0 10px;font-size:1.05rem;">Cách đăng ký</h3>
+        <p style="color:var(--muted);margin:0;font-size:0.92rem;">Bấm "Đăng ký" ở bộ bài tập em cần, làm theo 2 bước chuyển khoản và nhắn Zalo. Thầy sẽ thêm em vào đúng lớp trên Azota trong vòng 24 giờ.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer" id="contact">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>ThoMathClass</h4>
+        <p>Thầy Đỗ Quang Thọ<br>Giáo viên Toán — Trường THPT Lê Quý Đôn<br>Phường Hải An, Hải Phòng</p>
+      </div>
+      <div>
+        <h4>Liên hệ</h4>
+        <ul>
+          <li><a href="https://zalo.me/0388701385" target="_blank" rel="noopener">Zalo: 0388 701 385</a></li>
+          <li><a href="mailto:thomathclass@gmail.com">thomathclass@gmail.com</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Điều hướng</h4>
+        <ul>
+          <li><a href="baigiang.html">Bài giảng</a></li>
+          <li><a href="tailieu.html">Tài liệu</a></li>
+          <li><a href="khoahoc.html">Khóa học online</a></li>
+          <li><a href="lophoc.html">Các lớp học</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ThoMathClass — Đỗ Quang Thọ</span>
+      <a href="admin.html" class="footer-mini-link">Giáo viên đăng nhập</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ORDER MODAL -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal">
+    <button class="modal-close" aria-label="Đóng">&times;</button>
+    <p class="eyebrow">Đăng ký</p>
+    <h3 id="modal-product-name">Tên bộ bài tập</h3>
+    <p class="modal-product">Làm theo 2 bước dưới đây, Thầy sẽ thêm em vào lớp Azota trong 24 giờ.</p>
+    <div class="bank-box">
+      <div><span class="label">Ngân hàng</span><span class="value">VP Bank</span></div>
+      <div><span class="label">Số tài khoản</span><span class="value">0388701385</span></div>
+      <div><span class="label">Chủ tài khoản</span><span class="value">DO QUANG THO</span></div>
+      <div><span class="label">Nội dung CK</span><span class="value">MUA AZOTA + Tên bạn</span></div>
+    </div>
+    <ol>
+      <li>Chuyển khoản theo thông tin trên (ghi rõ nội dung).</li>
+      <li>Nhắn Zalo tên bộ bài tập vừa chọn để Thầy thêm vào lớp Azota.</li>
+    </ol>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-small" id="copy-stk" data-value="0388701385">Sao chép số TK</button>
+      <a href="#" id="modal-zalo-link" target="_blank" rel="noopener" class="btn btn-primary btn-small">Nhắn Zalo cho Thầy</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PRODUCT_CATEGORY = "azota";
+  const BUY_LABEL = "Đăng ký";
+</script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="script.js"></script>
+<script src="products-render.js"></script>
+</body>
+</html>
