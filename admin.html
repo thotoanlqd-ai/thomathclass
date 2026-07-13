@@ -61,7 +61,7 @@
 
           <!-- Thêm học sinh -->
           <div class="panel">
-            <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm học sinh mới</h3>
+            <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm 1 học sinh (lẻ, không theo danh sách)</h3>
             <div class="field">
               <label>Lớp</label>
               <select id="new-class"></select>
@@ -76,7 +76,7 @@
             </div>
             <div class="field">
               <label>Mật khẩu ban đầu</label>
-              <input type="text" id="new-password" placeholder="Vd: thomath2026" />
+              <input type="text" id="new-password" value="123abc" placeholder="Vd: 123abc" />
             </div>
             <p class="field-error" id="new-student-error"></p>
             <button class="btn btn-primary btn-small" id="btn-add-student">Thêm học sinh</button>
@@ -125,6 +125,57 @@
           </div>
 
         </div>
+
+        <!-- Nhập danh sách hàng loạt từ file Word/Excel -->
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Thêm học sinh hàng loạt theo lớp</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Bấm chọn 1 lớp, sau đó tải lên file danh sách (.xlsx, .csv hoặc .docx). Mã đăng nhập tự tạo theo quy tắc <span class="mono">tênlớp-hotenkhongdau</span> (vd: <span class="mono">12a6-nguyenvana</span>), mật khẩu mặc định cho tất cả là <strong class="mono">123abc</strong>. Sau khi tạo xong, hệ thống tự tải về 1 file Excel danh sách tài khoản vừa tạo.</p>
+
+          <div class="class-grid" id="bulk-class-grid"></div>
+
+          <div id="bulk-import-panel" hidden style="margin-top:22px;border-top:1px solid var(--card-border);padding-top:22px;">
+            <div class="panel-head">
+              <h4 id="bulk-import-class-name" style="margin:0;font-size:1rem;"></h4>
+              <button class="back-link" id="btn-bulk-back">← Chọn lớp khác</button>
+            </div>
+
+            <div class="admin-row" style="margin-top:14px;">
+              <div class="field">
+                <label>Chọn file (.xlsx, .csv, .docx)</label>
+                <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.docx" />
+              </div>
+              <button class="btn btn-outline btn-small" id="btn-read-file">Đọc file</button>
+            </div>
+            <p class="field-error" id="import-error"></p>
+
+            <div id="import-preview" hidden>
+              <h4 style="margin:16px 0 10px;font-size:0.92rem;">Xem lại danh sách trước khi tạo (<span id="import-count">0</span> học sinh)</h4>
+              <table class="data-table" id="import-preview-table">
+                <thead><tr><th>Họ tên (bấm để sửa)</th><th>Mã đăng nhập</th><th></th></tr></thead>
+                <tbody id="import-preview-body"></tbody>
+              </table>
+              <button class="btn btn-outline btn-small" id="btn-add-blank-row" style="margin-top:10px;">+ Thêm dòng trống</button>
+              <div style="margin-top:16px;">
+                <button class="btn btn-primary btn-small" id="btn-import-confirm">Tạo tài khoản cho toàn bộ danh sách</button>
+              </div>
+              <p class="field-error" id="import-progress" style="color:var(--chalk);"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Xuất điểm ra Excel -->
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">📊 Xuất điểm &amp; nhận xét ra Excel</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Xuất toàn bộ điểm số và nhận xét của một lớp ra file Excel để lưu trữ hoặc gửi phụ huynh.</p>
+          <div class="admin-row">
+            <div class="field">
+              <label>Chọn lớp cần xuất</label>
+              <select id="export-class"></select>
+            </div>
+            <button class="btn btn-primary btn-small" id="btn-export-excel">Xuất ra Excel</button>
+          </div>
+          <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
+        </div>
       </div>
 
       <!-- ===== Đăng nhập rồi nhưng không phải admin ===== -->
@@ -137,6 +188,10 @@
     </div>
   </section>
 </main>
+
+<!-- Thư viện đọc file Excel/Word -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 
 <!-- Firebase SDK (compat) -->
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
