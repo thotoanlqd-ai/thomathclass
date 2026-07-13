@@ -187,6 +187,81 @@ document.getElementById("btn-logout").addEventListener("click", () => {
   auth.signOut();
 });
 
+// ---------- Đổi mật khẩu ----------
+const passwordError = document.getElementById("password-error");
+const passwordSuccess = document.getElementById("password-success");
+const btnChangePassword = document.getElementById("btn-change-password");
+
+btnChangePassword.addEventListener("click", () => {
+  const oldPasswordInput = document.getElementById("old-password");
+  const newPassword1Input = document.getElementById("new-password-1");
+  const newPassword2Input = document.getElementById("new-password-2");
+
+  const oldPassword = oldPasswordInput.value;
+  const newPassword1 = newPassword1Input.value;
+  const newPassword2 = newPassword2Input.value;
+
+  passwordError.textContent = "";
+  passwordSuccess.style.display = "none";
+
+  if (!oldPassword || !newPassword1 || !newPassword2) {
+    passwordError.textContent = "Em nhập đủ cả 3 ô nhé.";
+    return;
+  }
+  if (newPassword1.length < 6) {
+    passwordError.textContent = "Mật khẩu mới cần ít nhất 6 ký tự.";
+    return;
+  }
+  if (newPassword1 !== newPassword2) {
+    passwordError.textContent = "Mật khẩu mới nhập lại chưa khớp.";
+    return;
+  }
+
+  const user = auth.currentUser;
+  if (!user) {
+    passwordError.textContent = "Phiên đăng nhập đã hết, em đăng nhập lại rồi thử tiếp nhé.";
+    return;
+  }
+
+  btnChangePassword.disabled = true;
+  btnChangePassword.textContent = "Đang xử lý...";
+  passwordError.textContent = "";
+
+  const credential = firebase.auth.EmailAuthProvider.credential(user.email, oldPassword);
+
+  user
+    .reauthenticateWithCredential(credential)
+    .then(function () {
+      return user.updatePassword(newPassword1);
+    })
+    .then(function () {
+      passwordError.textContent = "";
+      passwordSuccess.style.display = "block";
+      oldPasswordInput.value = "";
+      newPassword1Input.value = "";
+      newPassword2Input.value = "";
+      window.alert("Đổi mật khẩu thành công! Lần sau em nhớ đăng nhập bằng mật khẩu mới nhé.");
+    })
+    .catch(function (err) {
+      console.error("Lỗi đổi mật khẩu:", err.code, err.message);
+      if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential" || err.code === "auth/invalid-login-credentials") {
+        passwordError.textContent = "Mật khẩu hiện tại không đúng, em kiểm tra lại.";
+      } else if (err.code === "auth/too-many-requests") {
+        passwordError.textContent = "Em thử sai nhiều lần quá, chờ một lát rồi thử lại.";
+      } else if (err.code === "auth/weak-password") {
+        passwordError.textContent = "Mật khẩu mới quá đơn giản, em đặt mật khẩu khác nhé.";
+      } else if (err.code === "auth/requires-recent-login") {
+        passwordError.textContent = "Em đăng xuất rồi đăng nhập lại, sau đó thử đổi mật khẩu ngay nhé.";
+      } else {
+        passwordError.textContent = "Có lỗi xảy ra (" + err.code + "). Em chụp màn hình báo Thầy giúp.";
+      }
+    })
+    .finally(function () {
+      btnChangePassword.disabled = false;
+      btnChangePassword.textContent = "Đổi mật khẩu";
+    });
+});
+
 // ---------- Theo dõi trạng thái đăng nhập ----------
 auth.onAuthStateChanged((user) => {
   if (user) {
