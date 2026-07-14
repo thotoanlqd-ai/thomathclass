@@ -9,7 +9,7 @@
 //
 // TODO: thay toàn bộ giá trị "TODO_..." bên dưới bằng giá trị thật
 const firebaseConfig = {
-  apiKey: "AIzaSyDTfeIodEAPn-nfCrl-QhyZCWDMrHL9zAs",
+  apiKey: "AIzaSyCiLVgORcb1NBuLGI0UrThbcLNP47Ub3Ss",
   authDomain: "thomathclass.firebaseapp.com",
   projectId: "thomathclass",
   storageBucket: "thomathclass.firebasestorage.app",
