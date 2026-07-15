@@ -245,13 +245,14 @@ a { color: inherit; text-decoration: none; }
 }
 
 .hero-logo {
-  width: 220px;
-  max-width: 60%;
+  width: 140px;
+  max-width: 40%;
   margin: 14px 0 20px;
   display: block;
 }
 
 .stamp.hero-photo {
+  width: 340px;
   border-radius: 20px;
   border: 5px solid #fff;
   box-shadow: var(--shadow);
@@ -264,8 +265,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 860px) {
-  .hero-logo { width: 170px; margin: 10px auto 20px; }
-  .stamp.hero-photo { position: static; margin: 20px auto 0; transform: none; width: 200px; }
+  .hero-logo { width: 120px; margin: 10px auto 20px; }
+  .stamp.hero-photo { position: static; margin: 20px auto 0; transform: none; width: 260px; }
 }
 
 /* ---------- Section basics ---------- */
