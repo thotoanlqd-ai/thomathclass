@@ -230,33 +230,31 @@ a { color: inherit; text-decoration: none; }
 
 .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
 
-/* stamp / signature element */
-.stamp {
+.hero h1 {
+  font-size: clamp(1.5rem, 3vw, 2.3rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  max-width: 20ch;
+  margin: 14px 0 20px;
+}
+
+.hero-line { display: block; }
+
+.hero-divider {
+  display: block;
+  color: var(--pen-red);
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  margin: 8px 0;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.hero-photo-wrap {
   position: absolute;
   right: 8%;
   top: 40px;
-  width: 260px;
-  transform: rotate(6deg);
-  animation: stamp-in 0.7s cubic-bezier(.2,1.4,.4,1) 0.15s both;
-}
-@keyframes stamp-in {
-  0% { opacity: 0; transform: rotate(18deg) scale(0.6); }
-  100% { opacity: 1; transform: rotate(6deg) scale(1); }
-}
-
-.hero-logo {
-  width: 140px;
-  max-width: 40%;
-  margin: 14px 0 20px;
-  display: block;
-}
-
-.stamp.hero-photo {
-  width: 340px;
-  border-radius: 20px;
-  border: 5px solid #fff;
-  box-shadow: var(--shadow);
-  transform: none;
+  width: 300px;
   animation: photo-in 0.7s ease 0.15s both;
 }
 @keyframes photo-in {
@@ -264,9 +262,27 @@ a { color: inherit; text-decoration: none; }
   100% { opacity: 1; transform: translateY(0); }
 }
 
+.hero-photo {
+  display: block;
+  width: 100%;
+  border-radius: 20px;
+  border: 5px solid #fff;
+  box-shadow: var(--shadow);
+}
+
+.hero-badge {
+  position: absolute;
+  bottom: -22px;
+  left: -22px;
+  width: 108px;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(27, 42, 68, 0.22);
+  transform: rotate(-8deg);
+  border: 3px solid #fff;
+}
+
 @media (max-width: 860px) {
-  .hero-logo { width: 120px; margin: 10px auto 20px; }
-  .stamp.hero-photo { position: static; margin: 20px auto 0; transform: none; width: 260px; }
+  .hero-photo-wrap { position: static; margin: 20px auto 0; width: 240px; }
 }
 
 /* ---------- Section basics ---------- */
