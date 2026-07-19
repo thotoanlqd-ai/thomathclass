@@ -225,6 +225,37 @@
           </div>
           <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
         </div>
+
+        <!-- Xoá học sinh -->
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">🗑️ Xoá học sinh</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 6px;">Chọn lớp để xem danh sách, tick chọn học sinh cần xoá (chọn nhiều được), hoặc xoá sạch cả lớp.</p>
+          <p style="color:var(--muted);font-size:0.82rem;margin:0 0 16px;background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;">
+            ⚠️ Lưu ý: thao tác xoá ở đây làm học sinh <strong>mất quyền xem điểm/nhận xét ngay lập tức</strong> (không đăng nhập vào được nữa). Riêng tài khoản đăng nhập (email/mật khẩu) vẫn còn tồn tại trong Firebase — nếu thầy muốn xoá dứt điểm hoàn toàn (ví dụ để dùng lại đúng mã học sinh đó cho em khác), vào thêm <strong>Firebase Console → Authentication → Users</strong>, tìm đúng tài khoản và xoá tay ở đó.
+          </p>
+
+          <div class="field" style="max-width:320px;">
+            <label>Chọn lớp</label>
+            <select id="delete-class"></select>
+          </div>
+
+          <div id="delete-list-wrap" style="margin-top:14px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:var(--muted);margin-bottom:8px;">
+              <input type="checkbox" id="delete-select-all" /> Chọn tất cả
+            </label>
+            <table class="data-table" id="delete-list-table">
+              <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th></tr></thead>
+              <tbody id="delete-list-body"></tbody>
+            </table>
+            <p class="empty-note" id="delete-list-empty" hidden>Lớp này chưa có học sinh nào.</p>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+            <button class="btn btn-outline btn-small" id="btn-delete-selected">Xoá học sinh đã chọn</button>
+            <button class="btn btn-primary btn-small" id="btn-delete-whole-class" style="background:var(--pen-red-dark);">Xoá toàn bộ lớp này</button>
+          </div>
+          <p class="field-error" id="delete-status"></p>
+        </div>
       </div>
 
       <!-- ===== Đăng nhập rồi nhưng không phải admin ===== -->

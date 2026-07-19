@@ -122,6 +122,7 @@ function populateClassSelects() {
     document.getElementById("new-class"),
     document.getElementById("pick-class"),
     document.getElementById("export-class"),
+    document.getElementById("delete-class"),
   ];
   selects.forEach((sel) => {
     sel.innerHTML = "";
@@ -134,6 +135,7 @@ function populateClassSelects() {
   });
   loadStudentPicker(document.getElementById("pick-class").value);
   renderBulkClassGrid();
+  loadDeleteList();
 }
 
 // ---------- Lưới chọn lớp cho khu vực "Thêm học sinh hàng loạt" ----------
@@ -639,6 +641,127 @@ document.getElementById("btn-export-excel").addEventListener("click", () => {
     .catch((err) => {
       console.error(err);
       statusEl.textContent = "Có lỗi khi xuất file: " + err.message;
+    });
+});
+
+// ==========================================================
+// XOÁ HỌC SINH: xoá lẻ / nhiều / cả lớp
+// ==========================================================
+let deleteRosterCache = []; // [{uid, fullName, code}]
+
+document.getElementById("delete-class").addEventListener("change", loadDeleteList);
+
+function loadDeleteList() {
+  const classId = document.getElementById("delete-class").value;
+  const body = document.getElementById("delete-list-body");
+  const emptyNote = document.getElementById("delete-list-empty");
+  const selectAll = document.getElementById("delete-select-all");
+  selectAll.checked = false;
+  body.innerHTML = "";
+  emptyNote.hidden = true;
+  deleteRosterCache = [];
+
+  db.collection("roster")
+    .where("classId", "==", classId)
+    .orderBy("order")
+    .get()
+    .then((snap) => {
+      if (snap.empty) {
+        emptyNote.hidden = false;
+        return;
+      }
+      snap.forEach((doc) => {
+        const d = doc.data();
+        deleteRosterCache.push({ uid: doc.id, fullName: d.fullName, code: d.code });
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><input type="checkbox" class="delete-row-check" data-uid="${doc.id}" /></td>
+          <td>${escapeHtml(d.fullName || "")}</td>
+          <td class="mono">${escapeHtml(d.code || "")}</td>
+        `;
+        body.appendChild(tr);
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      emptyNote.hidden = false;
+      emptyNote.textContent = "Không tải được danh sách: " + err.message;
+    });
+}
+
+document.getElementById("delete-select-all").addEventListener("change", (e) => {
+  document.querySelectorAll(".delete-row-check").forEach((cb) => (cb.checked = e.target.checked));
+});
+
+// Xoá roster + students cho 1 danh sách uid, trả về Promise
+function deleteStudentsByUids(uids) {
+  const batchPromises = uids.map((uid) =>
+    Promise.all([
+      db.collection("roster").doc(uid).delete(),
+      db.collection("students").doc(uid).delete(),
+    ])
+  );
+  return Promise.all(batchPromises);
+}
+
+document.getElementById("btn-delete-selected").addEventListener("click", () => {
+  const statusEl = document.getElementById("delete-status");
+  const checked = Array.from(document.querySelectorAll(".delete-row-check:checked"));
+  if (!checked.length) {
+    statusEl.textContent = "Thầy chưa tick chọn học sinh nào.";
+    return;
+  }
+  const uids = checked.map((cb) => cb.dataset.uid);
+  const names = uids
+    .map((uid) => (deleteRosterCache.find((s) => s.uid === uid) || {}).fullName)
+    .filter(Boolean);
+
+  if (!confirm(`Xoá ${uids.length} học sinh sau đây?\n\n${names.join("\n")}\n\nKhông thể hoàn tác.`)) {
+    return;
+  }
+
+  statusEl.textContent = "Đang xoá...";
+  deleteStudentsByUids(uids)
+    .then(() => {
+      statusEl.textContent = `Đã xoá ${uids.length} học sinh.`;
+      loadDeleteList();
+      loadStudentPicker(document.getElementById("pick-class").value);
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi khi xoá: " + err.message;
+    });
+});
+
+document.getElementById("btn-delete-whole-class").addEventListener("click", () => {
+  const classId = document.getElementById("delete-class").value;
+  const className = (CLASS_LIST.find((c) => c.id === classId) || {}).name || classId;
+  const statusEl = document.getElementById("delete-status");
+
+  if (!deleteRosterCache.length) {
+    statusEl.textContent = "Lớp này đang không có học sinh nào.";
+    return;
+  }
+
+  const typed = prompt(
+    `Thao tác này sẽ xoá TOÀN BỘ ${deleteRosterCache.length} học sinh trong lớp "${className}".\n` +
+      `Không thể hoàn tác.\n\nĐể xác nhận, gõ chính xác tên lớp vào ô bên dưới:`
+  );
+  if (typed === null) return;
+  if (typed.trim().toLowerCase() !== className.trim().toLowerCase()) {
+    statusEl.textContent = "Tên lớp gõ không khớp, đã huỷ thao tác xoá.";
+    return;
+  }
+
+  const uids = deleteRosterCache.map((s) => s.uid);
+  statusEl.textContent = "Đang xoá cả lớp...";
+  deleteStudentsByUids(uids)
+    .then(() => {
+      statusEl.textContent = `Đã xoá toàn bộ ${uids.length} học sinh trong lớp ${className}.`;
+      loadDeleteList();
+      loadStudentPicker(document.getElementById("pick-class").value);
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi khi xoá: " + err.message;
     });
 });
 
