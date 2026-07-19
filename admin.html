@@ -226,12 +226,12 @@
           <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
         </div>
 
-        <!-- Xoá học sinh -->
+        <!-- Quản lý danh sách học sinh -->
         <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">🗑️ Xoá học sinh</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 6px;">Chọn lớp để xem danh sách, tick chọn học sinh cần xoá (chọn nhiều được), hoặc xoá sạch cả lớp.</p>
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">🗂️ Quản lý danh sách học sinh</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 6px;">Chọn lớp để xem danh sách. Tick chọn để xoá nhiều em cùng lúc, hoặc dùng nút riêng để xoá/reset mật khẩu từng em.</p>
           <p style="color:var(--muted);font-size:0.82rem;margin:0 0 16px;background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;">
-            ⚠️ Lưu ý: thao tác xoá ở đây làm học sinh <strong>mất quyền xem điểm/nhận xét ngay lập tức</strong> (không đăng nhập vào được nữa). Riêng tài khoản đăng nhập (email/mật khẩu) vẫn còn tồn tại trong Firebase — nếu thầy muốn xoá dứt điểm hoàn toàn (ví dụ để dùng lại đúng mã học sinh đó cho em khác), vào thêm <strong>Firebase Console → Authentication → Users</strong>, tìm đúng tài khoản và xoá tay ở đó.
+            ⚠️ Lưu ý: thao tác <strong>xoá</strong> làm học sinh mất quyền xem điểm/nhận xét ngay lập tức. Thao tác <strong>reset mật khẩu</strong> sẽ tự tạo lại tài khoản với mật khẩu mặc định <strong class="mono">123abc</strong> và giữ nguyên điểm/nhận xét — nhưng vì giới hạn của hệ thống, <strong>mã đăng nhập của em đó có thể đổi nhẹ</strong> (ví dụ thêm số ở cuối). Hệ thống sẽ hiện mã mới để thầy báo lại cho học sinh.
           </p>
 
           <div class="field" style="max-width:320px;">
@@ -244,7 +244,7 @@
               <input type="checkbox" id="delete-select-all" /> Chọn tất cả
             </label>
             <table class="data-table" id="delete-list-table">
-              <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th></tr></thead>
+              <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th><th></th></tr></thead>
               <tbody id="delete-list-body"></tbody>
             </table>
             <p class="empty-note" id="delete-list-empty" hidden>Lớp này chưa có học sinh nào.</p>

@@ -678,7 +678,26 @@ function loadDeleteList() {
           <td><input type="checkbox" class="delete-row-check" data-uid="${doc.id}" /></td>
           <td>${escapeHtml(d.fullName || "")}</td>
           <td class="mono">${escapeHtml(d.code || "")}</td>
+          <td style="white-space:nowrap;">
+            <button class="mini-btn" data-action="reset" data-uid="${doc.id}">Reset mật khẩu</button>
+            &nbsp;
+            <button class="mini-btn" data-action="delete-one" data-uid="${doc.id}" style="color:var(--muted);">Xoá</button>
+          </td>
         `;
+        tr.querySelector('[data-action="reset"]').addEventListener("click", () => resetStudentPassword(doc.id));
+        tr.querySelector('[data-action="delete-one"]').addEventListener("click", () => {
+          const s = deleteRosterCache.find((x) => x.uid === doc.id);
+          if (!confirm(`Xoá học sinh "${s.fullName}"?\n\nKhông thể hoàn tác.`)) return;
+          const statusEl = document.getElementById("delete-status");
+          statusEl.textContent = "Đang xoá...";
+          deleteStudentsByUids([doc.id])
+            .then(() => {
+              statusEl.textContent = `Đã xoá ${s.fullName}.`;
+              loadDeleteList();
+              loadStudentPicker(document.getElementById("pick-class").value);
+            })
+            .catch((err) => (statusEl.textContent = "Lỗi khi xoá: " + err.message));
+        });
         body.appendChild(tr);
       });
     })
@@ -764,6 +783,101 @@ document.getElementById("btn-delete-whole-class").addEventListener("click", () =
       statusEl.textContent = "Lỗi khi xoá: " + err.message;
     });
 });
+
+// ==========================================================
+// RESET MẬT KHẨU: tạo lại tài khoản với mật khẩu mặc định,
+// giữ nguyên điểm số + nhận xét cũ (mã đăng nhập có thể đổi nhẹ)
+// ==========================================================
+function resetStudentPassword(oldUid) {
+  const statusEl = document.getElementById("delete-status");
+  const student = deleteRosterCache.find((s) => s.uid === oldUid);
+  if (!student) return;
+
+  if (
+    !confirm(
+      `Reset mật khẩu cho "${student.fullName}" về mặc định (123abc)?\n\n` +
+        `Mã đăng nhập có thể đổi nhẹ (thêm số ở cuối), hệ thống sẽ báo mã mới sau khi xong.\n` +
+        `Điểm số và nhận xét cũ sẽ được giữ nguyên.`
+    )
+  ) {
+    return;
+  }
+
+  statusEl.textContent = `Đang reset mật khẩu cho ${student.fullName}...`;
+
+  Promise.all([
+    db.collection("roster").doc(oldUid).get(),
+    db.collection("students").doc(oldUid).get(),
+  ])
+    .then(([rosterDoc, studentDoc]) => {
+      if (!rosterDoc.exists || !studentDoc.exists) {
+        throw new Error("Không tìm thấy dữ liệu học sinh này.");
+      }
+      const rosterData = rosterDoc.data();
+      const studentData = studentDoc.data();
+      const baseCode = rosterData.code || student.fullName.toLowerCase();
+      const classId = rosterData.classId;
+      const fullName = rosterData.fullName;
+
+      return tryCreateWithFreeCode(baseCode, classId, fullName, studentData);
+    })
+    .then((newCode) => {
+      // Xoá bản ghi cũ (tài khoản đăng nhập cũ trong Firebase Auth sẽ mồ côi, không dùng được nữa nhưng không xoá hết được từ trình duyệt)
+      return deleteStudentsByUids([oldUid]).then(() => newCode);
+    })
+    .then((newCode) => {
+      statusEl.textContent = "";
+      alert(
+        `Đã reset xong cho ${student.fullName}!\n\n` +
+          `Mã đăng nhập mới: ${newCode}\n` +
+          `Mật khẩu: 123abc\n\n` +
+          `Thầy báo lại mã đăng nhập mới này cho học sinh nhé.`
+      );
+      loadDeleteList();
+      loadStudentPicker(document.getElementById("pick-class").value);
+    })
+    .catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Lỗi khi reset: " + err.message;
+    });
+}
+
+// Thử tạo tài khoản mới với mã dựa trên baseCode, tự thêm số nếu bị trùng (email đã tồn tại)
+function tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, attempt) {
+  attempt = attempt || 1;
+  const candidateCode = attempt === 1 ? baseCode : baseCode + "-" + attempt;
+  const email = candidateCode + "@" + LOGIN_EMAIL_DOMAIN;
+
+  return secondaryAuth
+    .createUserWithEmailAndPassword(email, "123abc")
+    .then((cred) => {
+      const uid = cred.user.uid;
+      const order = Date.now();
+      return Promise.all([
+        db.collection("roster").doc(uid).set({ fullName, classId, code: candidateCode, order }),
+        db
+          .collection("students")
+          .doc(uid)
+          .set({
+            fullName,
+            classId,
+            scores: oldStudentData.scores || [],
+            comments: oldStudentData.comments || [],
+          }),
+      ])
+        .then(() => secondaryAuth.signOut())
+        .then(() => candidateCode);
+    })
+    .catch((err) => {
+      try {
+        secondaryAuth.signOut();
+      } catch (e) {}
+      if (err.code === "auth/email-already-in-use" && attempt < 20) {
+        return tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, attempt + 1);
+      }
+      throw err;
+    });
+}
 
 function escapeHtml(str) {
   const div = document.createElement("div");
