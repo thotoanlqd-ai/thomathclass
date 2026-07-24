@@ -113,9 +113,9 @@ a { color: inherit; text-decoration: none; }
   padding: 4px 0;
 }
 
-.nav-links a:not(.btn-azota):hover { color: var(--pen-red); }
+.nav-links a:hover { color: var(--pen-red); }
 
-.nav-links a:not(.btn-azota)::after {
+.nav-links a::after {
   content: "";
   position: absolute;
   left: 0; bottom: -2px;
@@ -123,21 +123,23 @@ a { color: inherit; text-decoration: none; }
   background: var(--pen-red);
   transition: width 0.2s ease;
 }
-.nav-links a:not(.btn-azota):hover::after { width: 100%; }
+.nav-links a:hover::after { width: 100%; }
 
 .btn-azota {
-  background: var(--chalk);
-  color: #fff !important;
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 0.88rem;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: transform 0.15s ease, background 0.15s ease;
 }
-.btn-azota:hover { background: var(--chalk-light); transform: translateY(-1px); }
+
+/* Current page indicator: green outline around the active nav item */
+.nav-links a.active {
+  color: var(--chalk);
+  border: 2px solid var(--chalk);
+  border-radius: 999px;
+  padding: 4px 14px;
+}
+.nav-links a.active::after { display: none; }
+.nav-links a.active:hover { color: var(--chalk); }
 
 .nav-toggle {
   display: none;

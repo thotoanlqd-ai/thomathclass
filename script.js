@@ -9,6 +9,16 @@ if (navToggle && navLinks) {
   });
 }
 
+// --- Highlight current page in nav ---
+if (navLinks) {
+  const currentPage = location.pathname.split("/").pop() || "index.html";
+  navLinks.querySelectorAll("a").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (href.includes("#")) return; // in-page anchor, not a distinct page
+    if (href === currentPage) link.classList.add("active");
+  });
+}
+
 // --- Scroll reveal ---
 const revealEls = document.querySelectorAll(".reveal");
 if ("IntersectionObserver" in window && revealEls.length) {
