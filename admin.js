@@ -1155,8 +1155,10 @@ function showMemberDetail(uid, memberData) {
       snap.forEach((doc) => {
         const d = doc.data();
         const when = d.purchasedAt && d.purchasedAt.toDate ? formatDateTimeVN(d.purchasedAt.toDate()) : "—";
-        const amountLabel = d.method === "free" ? "Miễn phí" : Number(d.amountVnd || 0).toLocaleString("vi-VN") + "đ";
-        const methodLabel = d.method === "free" ? "Dùng miễn phí" : "Chuyển khoản (payOS)";
+        const amountLabel =
+          d.method === "free" || d.method === "admin" ? "Miễn phí" : Number(d.amountVnd || 0).toLocaleString("vi-VN") + "đ";
+        const methodLabel =
+          d.method === "free" ? "Dùng miễn phí" : d.method === "admin" ? "Giáo viên (miễn phí)" : "Chuyển khoản (payOS)";
         const categoryLabel = CONTENT_CATEGORY_LABELS[d.category] || d.category || "";
         const tr = document.createElement("tr");
         tr.innerHTML = `

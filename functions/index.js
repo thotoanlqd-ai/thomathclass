@@ -25,6 +25,9 @@ const db = admin.firestore();
 
 const REGION = "asia-southeast1";
 
+// Phải khớp với ADMIN_UID trong firebase-config.js — giáo viên xem/tải mọi nội dung miễn phí, không qua payOS
+const ADMIN_UID = "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+
 const payosClientId = defineSecret("PAYOS_CLIENT_ID");
 const payosApiKey = defineSecret("PAYOS_API_KEY");
 const payosChecksumKey = defineSecret("PAYOS_CHECKSUM_KEY");
@@ -65,6 +68,18 @@ exports.claimProduct = onCall(
     const existingPurchase = await purchaseRef.get();
     if (existingPurchase.exists) {
       return { granted: true, alreadyOwned: true };
+    }
+
+    // Tài khoản giáo viên: luôn được cấp quyền ngay, không phải thanh toán
+    if (uid === ADMIN_UID) {
+      await purchaseRef.set({
+        title: product.title || "",
+        category: product.category || "",
+        amountVnd: 0,
+        method: "admin",
+        purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { granted: true, alreadyOwned: false };
     }
 
     const amountVnd = Number(product.amountVnd) || 0;
