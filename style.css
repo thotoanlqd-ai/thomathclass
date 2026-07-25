@@ -886,3 +886,35 @@ section { padding: 64px 0; }
   font-size: 0.78rem;
   color: rgba(255,255,255,0.4) !important;
 }
+
+/* ---------- Nav: trạng thái đăng nhập (khách/học sinh) ---------- */
+.nav-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nav-account:empty { display: none; }
+.nav-account-email {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-account-logout {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pen-red);
+  padding: 0;
+}
+.nav-account-logout:hover { text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .nav-account { padding: 4px 0 0; }
+}

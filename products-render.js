@@ -3,7 +3,11 @@
 // Mỗi trang cần khai báo trước khi include file này:
 //   const PRODUCT_CATEGORY = "baigiang" | "tailieu" | "khoahoc" | "azota";
 //   const BUY_LABEL = "Mua ngay" | "Đăng ký";
-// Yêu cầu: firebase-config.js đã chạy trước (khai báo db), script.js đã chạy trước (openOrderModal)
+// Yêu cầu: firebase-config.js, members.js, auth-modal.js, payment.js đã chạy trước.
+//
+// Nội dung thật (linkUrl) KHÔNG còn nằm trong doc products/{id} — nó nằm ở
+// products/{id}/private/content và chỉ đọc được nếu đã mua (xem firestore-rules.txt).
+// Vì vậy card sản phẩm chỉ hiện link SAU KHI xác nhận đã mua/đã dùng miễn phí.
 
 const CATEGORY_ICONS = {
   baigiang:
@@ -33,21 +37,38 @@ function slugifyTag(tag) {
 }
 
 let allProducts = [];
+let purchasesMap = {}; // { [productId]: purchaseData } — sản phẩm user hiện tại đã mua/đã dùng miễn phí
+let currentFilterSlug = "all";
 
 function loadProducts() {
   const grid = document.getElementById("product-grid");
   const emptyNote = document.getElementById("products-empty");
-  const filterBar = document.getElementById("filter-bar");
 
-  db.collection("products")
+  const productsPromise = db
+    .collection("products")
     .where("category", "==", PRODUCT_CATEGORY)
     .orderBy("order")
-    .get()
-    .then((snap) => {
+    .get();
+
+  // Đợi Firebase Auth khôi phục phiên đăng nhập (nếu có) trước khi đọc danh sách đã mua,
+  // để không hiển thị nhầm "chưa mua" ngay lúc mới tải trang.
+  const authReadyPromise = new Promise((resolve) => {
+    const unsub = auth.onAuthStateChanged((user) => {
+      unsub();
+      resolve(user);
+    });
+  });
+
+  Promise.all([productsPromise, authReadyPromise])
+    .then(([snap]) => {
       allProducts = [];
       snap.forEach((doc) => allProducts.push(Object.assign({ id: doc.id }, doc.data())));
+      return getMyPurchasesMap();
+    })
+    .then((purchases) => {
+      purchasesMap = purchases;
       buildFilterBar();
-      renderProductGrid(allProducts);
+      renderProductGrid(getFilteredProducts());
     })
     .catch((err) => {
       console.error(err);
@@ -55,6 +76,18 @@ function loadProducts() {
       emptyNote.hidden = false;
       emptyNote.textContent = "Không tải được nội dung, thầy/em thử tải lại trang.";
     });
+}
+
+function getFilteredProducts() {
+  if (currentFilterSlug === "all") return allProducts;
+  return allProducts.filter((p) => slugifyTag(p.tag || "Chung") === currentFilterSlug);
+}
+
+// Gọi từ payment.js ngay sau khi 1 sản phẩm được cấp quyền (mua xong hoặc claim miễn phí),
+// để card đổi trạng thái ngay mà không cần tải lại trang.
+function markProductOwned(productId) {
+  purchasesMap[productId] = purchasesMap[productId] || { purchasedAt: new Date() };
+  renderProductGrid(getFilteredProducts());
 }
 
 function buildFilterBar() {
@@ -89,11 +122,36 @@ function buildFilterBar() {
 function setActiveFilter(activeBtn, filterSlug) {
   document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
   activeBtn.classList.add("active");
-  if (filterSlug === "all") {
-    renderProductGrid(allProducts);
-  } else {
-    renderProductGrid(allProducts.filter((p) => slugifyTag(p.tag || "Chung") === filterSlug));
-  }
+  currentFilterSlug = filterSlug;
+  renderProductGrid(getFilteredProducts());
+}
+
+// Mở nội dung của 1 sản phẩm đã sở hữu — đọc link ngay lúc bấm (không lưu link ra HTML
+// công khai), theo đúng rule products/{id}/private/content chỉ ai đã mua mới đọc được.
+function openOwnedContent(p, btnEl) {
+  const originalLabel = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = "Đang mở...";
+  db.collection("products")
+    .doc(p.id)
+    .collection("private")
+    .doc("content")
+    .get()
+    .then((snap) => {
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+      if (snap.exists && snap.data().linkUrl) {
+        window.open(snap.data().linkUrl, "_blank", "noopener");
+      } else {
+        alert("Nội dung đang được Thầy cập nhật, thầy/em quay lại sau nhé.");
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+      alert("Có lỗi khi mở nội dung, thử lại sau.");
+    });
 }
 
 function renderProductGrid(products) {
@@ -112,9 +170,10 @@ function renderProductGrid(products) {
     card.className = "product-card";
 
     const iconSvg = CATEGORY_ICONS[PRODUCT_CATEGORY] || CATEGORY_ICONS.tailieu;
-    const linkHtml = p.linkUrl
-      ? `<div class="product-links"><a href="${escapeHtmlP(p.linkUrl)}" target="_blank" rel="noopener" class="link-azota">${escapeHtmlP(p.linkLabel || "Xem thêm →")}</a></div>`
-      : "";
+    const owned = !!purchasesMap[p.id];
+    const actionHtml = owned
+      ? '<button class="btn btn-primary btn-small" data-action="open">Xem/Tải nội dung</button>'
+      : '<button class="btn btn-primary btn-small" data-action="buy">' + escapeHtmlP(BUY_LABEL) + "</button>";
 
     card.innerHTML = `
       <div class="product-thumb"><span class="tag mono">${escapeHtmlP((p.tag || "CHUNG").toUpperCase())}</span>${iconSvg}</div>
@@ -123,15 +182,24 @@ function renderProductGrid(products) {
         <p>${escapeHtmlP(p.description || "")}</p>
         <div class="product-foot">
           <span class="price">${escapeHtmlP(p.price || "")}</span>
-          <button class="btn btn-primary btn-small" data-buy-title="${escapeHtmlP(p.title)}">${BUY_LABEL}</button>
+          ${actionHtml}
         </div>
       </div>
-      ${linkHtml}
     `;
 
-    card.querySelector("[data-buy-title]").addEventListener("click", (e) => {
-      openOrderModal(e.target.dataset.buyTitle);
-    });
+    const actionBtn = card.querySelector("[data-action]");
+    if (owned) {
+      actionBtn.addEventListener("click", () => openOwnedContent(p, actionBtn));
+    } else {
+      actionBtn.addEventListener("click", () => {
+        handleBuyClick({
+          id: p.id,
+          title: p.title,
+          category: p.category,
+          amountVnd: p.amountVnd === undefined ? null : p.amountVnd,
+        });
+      });
+    }
 
     grid.appendChild(card);
   });

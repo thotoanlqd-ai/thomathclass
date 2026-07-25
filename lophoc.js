@@ -110,8 +110,9 @@ function doLogin() {
   loginError.textContent = "Đang đăng nhập...";
   auth
     .signInWithEmailAndPassword(email, password)
-    .then(() => {
+    .then((cred) => {
       loginModal.classList.remove("open");
+      trackMemberLogin(cred.user, { accountType: "student", classId: currentClassId, displayName: pendingName });
     })
     .catch((err) => {
       console.error(err);

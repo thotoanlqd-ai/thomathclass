@@ -115,6 +115,7 @@ function extractNamesFromText(text) {
 function initAdminPanel() {
   populateClassSelects();
   initContentManager();
+  loadMembersList();
 }
 
 function populateClassSelects() {
@@ -918,6 +919,7 @@ function resetContentForm() {
   document.getElementById("content-title").value = "";
   document.getElementById("content-desc").value = "";
   document.getElementById("content-price").value = "";
+  document.getElementById("content-amount").value = "";
   document.getElementById("content-tag").value = "";
   document.getElementById("content-link-url").value = "";
   document.getElementById("content-link-label").value = "";
@@ -974,20 +976,40 @@ function editContentItem(id, data) {
   document.getElementById("content-title").value = data.title || "";
   document.getElementById("content-desc").value = data.description || "";
   document.getElementById("content-price").value = data.price || "";
+  document.getElementById("content-amount").value =
+    data.amountVnd === undefined || data.amountVnd === null ? "" : data.amountVnd;
   document.getElementById("content-tag").value = data.tag || "";
-  document.getElementById("content-link-url").value = data.linkUrl || "";
-  document.getElementById("content-link-label").value = data.linkLabel || "";
+  document.getElementById("content-link-url").value = "";
+  document.getElementById("content-link-label").value = "";
   document.getElementById("content-error").textContent = "";
   document.getElementById("btn-content-save").textContent = "Cập nhật";
   document.getElementById("btn-content-cancel-edit").hidden = false;
   window.scrollTo({ top: document.getElementById("content-title").getBoundingClientRect().top + window.scrollY - 100, behavior: "smooth" });
+
+  // Link nội dung nằm ở subcollection riêng (products/{id}/private/content) — tải thêm để hiện lên form sửa
+  db.collection("products")
+    .doc(id)
+    .collection("private")
+    .doc("content")
+    .get()
+    .then((snap) => {
+      if (snap.exists && currentEditingContentId === id) {
+        document.getElementById("content-link-url").value = snap.data().linkUrl || "";
+        document.getElementById("content-link-label").value = snap.data().linkLabel || "";
+      }
+    })
+    .catch((err) => console.error(err));
 }
 
 function deleteContentItem(id, title) {
   if (!confirm(`Xoá "${title}"? Không thể hoàn tác.`)) return;
   db.collection("products")
     .doc(id)
+    .collection("private")
+    .doc("content")
     .delete()
+    .catch(() => {})
+    .then(() => db.collection("products").doc(id).delete())
     .then(() => loadContentList())
     .catch((err) => alert("Lỗi khi xoá: " + err.message));
 }
@@ -996,6 +1018,7 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
   const title = document.getElementById("content-title").value.trim();
   const description = document.getElementById("content-desc").value.trim();
   const price = document.getElementById("content-price").value.trim();
+  const amountRaw = document.getElementById("content-amount").value.trim();
   const tag = document.getElementById("content-tag").value.trim();
   const linkUrl = document.getElementById("content-link-url").value.trim();
   const linkLabel = document.getElementById("content-link-label").value.trim();
@@ -1006,6 +1029,10 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
     errorEl.textContent = "Thầy nhập tiêu đề đã nhé.";
     return;
   }
+  if (amountRaw !== "" && (isNaN(Number(amountRaw)) || Number(amountRaw) < 0)) {
+    errorEl.textContent = "Số tiền phải là số không âm, hoặc để trống nếu giá Liên hệ.";
+    return;
+  }
 
   const data = {
     category: currentContentCategory,
@@ -1013,16 +1040,27 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
     description,
     price,
     tag,
-    linkUrl,
-    linkLabel,
+    amountVnd: amountRaw === "" ? null : Number(amountRaw),
   };
+
+  // Link nội dung thật lưu riêng ở subcollection private — chỉ ai đã mua mới đọc được (xem firestore-rules.txt)
+  function savePrivateContent(productId) {
+    return db
+      .collection("products")
+      .doc(productId)
+      .collection("private")
+      .doc("content")
+      .set({ linkUrl, linkLabel });
+  }
 
   errorEl.textContent = "Đang lưu...";
 
   if (currentEditingContentId) {
+    const productId = currentEditingContentId;
     db.collection("products")
-      .doc(currentEditingContentId)
+      .doc(productId)
       .update(data)
+      .then(() => savePrivateContent(productId))
       .then(() => {
         errorEl.textContent = "";
         resetContentForm();
@@ -1033,6 +1071,7 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
     data.order = Date.now();
     db.collection("products")
       .add(data)
+      .then((docRef) => savePrivateContent(docRef.id))
       .then(() => {
         errorEl.textContent = "";
         resetContentForm();
@@ -1040,4 +1079,103 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
       })
       .catch((err) => (errorEl.textContent = "Lỗi: " + err.message));
   }
+});
+
+// ==========================================================
+// QUẢN LÝ THÀNH VIÊN
+// ==========================================================
+function loadMembersList() {
+  const body = document.getElementById("members-list-body");
+  const emptyNote = document.getElementById("members-list-empty");
+  body.innerHTML = "";
+  emptyNote.hidden = true;
+  document.getElementById("member-detail-panel").hidden = true;
+
+  db.collection("members")
+    .orderBy("lastLoginAt", "desc")
+    .get()
+    .then((snap) => {
+      const rows = snap.docs.filter((doc) => doc.id !== ADMIN_UID);
+      if (!rows.length) {
+        emptyNote.hidden = false;
+        return;
+      }
+      rows.forEach((doc) => {
+        const d = doc.data();
+        const typeLabel = d.accountType === "student" ? "Học sinh" : "Khách hàng";
+        const lastLogin = d.lastLoginAt && d.lastLoginAt.toDate ? formatDateTimeVN(d.lastLoginAt.toDate()) : "—";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(d.email || "")}</td>
+          <td>${escapeHtml(typeLabel)}</td>
+          <td>${escapeHtml(String(d.loginCount || 0))}</td>
+          <td>${escapeHtml(lastLogin)}</td>
+          <td><button class="mini-btn" data-action="detail">Xem đã mua</button></td>
+        `;
+        tr.querySelector('[data-action="detail"]').addEventListener("click", () => showMemberDetail(doc.id, d));
+        body.appendChild(tr);
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      emptyNote.hidden = false;
+      emptyNote.textContent = "Không tải được danh sách: " + err.message;
+    });
+}
+
+function formatDateTimeVN(date) {
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function showMemberDetail(uid, memberData) {
+  const panel = document.getElementById("member-detail-panel");
+  const body = document.getElementById("member-purchases-body");
+  const emptyNote = document.getElementById("member-purchases-empty");
+  document.getElementById("member-detail-title").textContent = "Đã mua/dùng — " + (memberData.email || uid);
+  body.innerHTML = "";
+  emptyNote.hidden = true;
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  db.collection("members")
+    .doc(uid)
+    .collection("purchases")
+    .get()
+    .then((snap) => {
+      if (snap.empty) {
+        emptyNote.hidden = false;
+        return;
+      }
+      snap.forEach((doc) => {
+        const d = doc.data();
+        const when = d.purchasedAt && d.purchasedAt.toDate ? formatDateTimeVN(d.purchasedAt.toDate()) : "—";
+        const amountLabel = d.method === "free" ? "Miễn phí" : Number(d.amountVnd || 0).toLocaleString("vi-VN") + "đ";
+        const methodLabel = d.method === "free" ? "Dùng miễn phí" : "Chuyển khoản (payOS)";
+        const categoryLabel = CONTENT_CATEGORY_LABELS[d.category] || d.category || "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(d.title || doc.id)}</td>
+          <td>${escapeHtml(categoryLabel)}</td>
+          <td>${escapeHtml(amountLabel)}</td>
+          <td>${escapeHtml(methodLabel)}</td>
+          <td>${escapeHtml(when)}</td>
+        `;
+        body.appendChild(tr);
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      emptyNote.hidden = false;
+      emptyNote.textContent = "Không tải được: " + err.message;
+    });
+}
+
+document.getElementById("btn-member-detail-close").addEventListener("click", () => {
+  document.getElementById("member-detail-panel").hidden = true;
 });

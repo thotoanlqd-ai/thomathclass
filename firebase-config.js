@@ -42,3 +42,8 @@ const CLASS_LIST = [
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+
+// Cloud Functions (thanh toán payOS) — chỉ dùng ở các trang có nạp thêm
+// thẻ <script> firebase-functions-compat.js (baigiang/tailieu/khoahoc/azota.html).
+// Region phải khớp với region khai báo trong functions/index.js.
+const fns = typeof firebase.functions === "function" ? firebase.app().functions("asia-southeast1") : null;

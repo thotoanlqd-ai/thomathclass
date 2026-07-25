@@ -36,6 +36,7 @@
         Bài tập trên Azota
       </a>
       <a href="index.html#contact">Liên hệ</a>
+      <div class="nav-account" id="nav-account"></div>
     </div>
   </nav>
 </header>
@@ -92,26 +93,105 @@
   </div>
 </footer>
 
-<!-- ORDER MODAL -->
-<div class="modal-overlay" id="order-modal">
+<!-- MODAL: đăng nhập / đăng ký (khách hàng hoặc học sinh trong lớp) -->
+<div class="modal-overlay" id="auth-modal">
   <div class="modal">
-    <button class="modal-close" aria-label="Đóng">&times;</button>
-    <p class="eyebrow">Đặt mua</p>
-    <h3 id="modal-product-name">Tên sản phẩm</h3>
-    <p class="modal-product">Làm theo 2 bước dưới đây, Thầy sẽ gửi tài liệu qua Zalo/email trong 24 giờ.</p>
-    <div class="bank-box">
-      <div><span class="label">Ngân hàng</span><span class="value">VP Bank</span></div>
-      <div><span class="label">Số tài khoản</span><span class="value">0388701385</span></div>
-      <div><span class="label">Chủ tài khoản</span><span class="value">DO QUANG THO</span></div>
-      <div><span class="label">Nội dung CK</span><span class="value">MUA TAILIEU + Tên bạn</span></div>
+    <button class="modal-close" id="auth-modal-close" aria-label="Đóng">&times;</button>
+    <p class="eyebrow">Đăng nhập để tiếp tục</p>
+    <h3>Đăng nhập / Đăng ký</h3>
+    <p class="modal-product">Cần đăng nhập trước khi mua hoặc dùng nội dung này.</p>
+
+    <div class="filter-bar" id="auth-tabs" style="margin-bottom:18px;">
+      <button class="filter-btn active" data-tab="customer">Khách hàng / Phụ huynh</button>
+      <button class="filter-btn" data-tab="student">Học sinh trong lớp</button>
     </div>
-    <ol>
-      <li>Chuyển khoản theo thông tin trên (ghi rõ nội dung).</li>
-      <li>Nhắn Zalo tên sản phẩm vừa chọn để Thầy gửi tài liệu.</li>
-    </ol>
-    <div class="modal-actions">
-      <button class="btn btn-outline btn-small" id="copy-stk" data-value="0388701385">Sao chép số TK</button>
-      <a href="#" id="modal-zalo-link" target="_blank" rel="noopener" class="btn btn-primary btn-small">Nhắn Zalo cho Thầy</a>
+
+    <div id="auth-tab-customer">
+      <div class="field">
+        <label for="auth-email">Email</label>
+        <input type="email" id="auth-email" placeholder="email@vidu.com" />
+      </div>
+      <div class="field">
+        <label for="auth-password">Mật khẩu</label>
+        <input type="password" id="auth-password" placeholder="Ít nhất 6 ký tự" />
+      </div>
+      <p class="field-error" id="auth-error"></p>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-small" id="btn-auth-login">Đăng nhập</button>
+        <button class="btn btn-outline btn-small" id="btn-auth-register">Đăng ký tài khoản mới</button>
+      </div>
+      <p style="margin-top:12px;">
+        <a href="#" id="link-forgot-password" style="font-size:0.85rem;color:var(--muted);text-decoration:underline;">Quên mật khẩu?</a>
+      </p>
+    </div>
+
+    <div id="auth-tab-student" hidden>
+      <div id="auth-student-classes">
+        <p style="font-size:0.88rem;color:var(--muted);margin:0 0 12px;">Chọn lớp của em:</p>
+        <div class="class-grid" id="auth-student-class-grid" style="grid-template-columns:repeat(2,1fr);"></div>
+      </div>
+      <div id="auth-student-roster" hidden>
+        <button class="back-link" id="btn-auth-student-back">← Chọn lớp khác</button>
+        <p style="font-size:0.88rem;color:var(--muted);margin:12px 0;">Bấm vào tên của em:</p>
+        <div class="roster-list" id="auth-student-roster-list" style="grid-template-columns:1fr;"></div>
+      </div>
+      <div id="auth-student-password" hidden>
+        <button class="back-link" id="btn-auth-student-back2">← Chọn lại</button>
+        <p class="login-student-name" id="auth-student-name" style="margin-top:12px;">—</p>
+        <div class="field">
+          <label for="auth-student-password-input">Mật khẩu</label>
+          <input type="password" id="auth-student-password-input" placeholder="Mật khẩu Thầy đã cấp" />
+        </div>
+        <p class="field-error" id="auth-student-error"></p>
+        <div class="modal-actions">
+          <button class="btn btn-primary btn-small" id="btn-auth-student-login">Đăng nhập</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: thanh toán tự động payOS / cấp nội dung -->
+<div class="modal-overlay" id="payment-modal">
+  <div class="modal">
+    <button class="modal-close" id="payment-modal-close" aria-label="Đóng">&times;</button>
+    <p class="eyebrow">Đặt mua</p>
+    <h3 id="payment-product-name">Tên sản phẩm</h3>
+
+    <div id="payment-state-loading">
+      <p class="modal-product">Đang xử lý...</p>
+    </div>
+
+    <div id="payment-state-qr" hidden>
+      <p class="modal-product">Quét mã QR bằng app ngân hàng để thanh toán. Trang sẽ tự cập nhật ngay khi nhận được tiền, không cần bấm gì thêm.</p>
+      <div style="text-align:center;margin-bottom:16px;">
+        <canvas id="payment-qr-canvas"></canvas>
+      </div>
+      <div class="bank-box">
+        <div><span class="label">Số tiền</span><span class="value" id="payment-amount">—</span></div>
+      </div>
+      <p class="field-error" id="payment-status-text" style="color:var(--muted);"></p>
+      <p style="margin-top:8px;">
+        <a href="#" id="payment-checkout-link" target="_blank" rel="noopener" style="font-size:0.85rem;color:var(--muted);text-decoration:underline;">Không quét được QR? Mở trang thanh toán</a>
+      </p>
+    </div>
+
+    <div id="payment-state-granted" hidden>
+      <p class="modal-product">✓ Đã sẵn sàng! Bấm nút bên dưới để xem/tải nội dung.</p>
+      <div class="modal-actions">
+        <a href="#" id="payment-content-link" target="_blank" rel="noopener" class="btn btn-primary btn-small">Xem/Tải nội dung</a>
+      </div>
+    </div>
+
+    <div id="payment-state-contact" hidden>
+      <p class="modal-product">Sản phẩm này có giá theo thoả thuận. Nhắn Zalo cho Thầy để được tư vấn và đặt mua nhé.</p>
+      <div class="modal-actions">
+        <a href="https://zalo.me/0388701385" target="_blank" rel="noopener" class="btn btn-primary btn-small">Nhắn Zalo cho Thầy</a>
+      </div>
+    </div>
+
+    <div id="payment-state-error" hidden>
+      <p class="field-error" id="payment-error-text"></p>
     </div>
   </div>
 </div>
@@ -120,11 +200,16 @@
   const PRODUCT_CATEGORY = "tailieu";
   const BUY_LABEL = "Mua ngay";
 </script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-functions-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="script.js"></script>
+<script src="members.js"></script>
+<script src="auth-modal.js"></script>
+<script src="payment.js"></script>
 <script src="products-render.js"></script>
 <script>
   if ("serviceWorker" in navigator) {

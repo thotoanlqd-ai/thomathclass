@@ -87,12 +87,16 @@
                 <textarea id="content-desc" rows="2" placeholder="Mô tả ngắn gọn nội dung..."></textarea>
               </div>
               <div class="admin-row">
-                <div class="field"><label>Giá</label><input type="text" id="content-price" placeholder="Vd: 150.000đ" /></div>
+                <div class="field"><label>Giá hiển thị</label><input type="text" id="content-price" placeholder="Vd: 150.000đ, Miễn phí, Liên hệ" /></div>
+                <div class="field" style="max-width:190px;"><label>Số tiền (VNĐ)</label><input type="number" id="content-amount" min="0" step="1000" placeholder="Vd: 150000" /></div>
                 <div class="field"><label>Nhãn/tag (dùng để lọc)</label><input type="text" id="content-tag" placeholder="Vd: Tốt nghiệp" /></div>
               </div>
+              <p style="color:var(--muted);font-size:0.8rem;margin:-6px 0 14px;">
+                Số tiền dùng để tạo QR thanh toán tự động: điền <strong>0</strong> nếu miễn phí, để <strong>trống</strong> nếu giá "Liên hệ" (nút mua sẽ mở Zalo thay vì QR).
+              </p>
               <div class="admin-row">
-                <div class="field"><label>Link phụ (không bắt buộc)</label><input type="text" id="content-link-url" placeholder="Vd: link bài tập Azota" /></div>
-                <div class="field"><label>Nhãn cho link phụ</label><input type="text" id="content-link-label" placeholder="Vd: Làm bài trên Azota →" /></div>
+                <div class="field"><label>Link nội dung (học sinh/khách chỉ thấy SAU KHI đã mua)</label><input type="text" id="content-link-url" placeholder="Vd: link Google Drive, link bài tập Azota" /></div>
+                <div class="field"><label>Nhãn nút xem nội dung</label><input type="text" id="content-link-label" placeholder="Vd: Làm bài trên Azota →" /></div>
               </div>
               <p class="field-error" id="content-error"></p>
               <div style="display:flex;gap:10px;">
@@ -261,6 +265,30 @@
             <button class="btn btn-primary btn-small" id="btn-delete-whole-class" style="background:var(--pen-red-dark);">Xoá toàn bộ lớp này</button>
           </div>
           <p class="field-error" id="delete-status"></p>
+        </div>
+
+        <!-- Quản lý thành viên -->
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Quản lý thành viên</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Danh sách khách hàng &amp; học sinh đã từng đăng nhập ở trang bán hàng (không tính tài khoản Giáo viên), sắp xếp theo lần đăng nhập gần nhất.</p>
+
+          <table class="data-table" id="members-table">
+            <thead><tr><th>Email</th><th>Loại</th><th>Số lần đăng nhập</th><th>Đăng nhập gần nhất</th><th></th></tr></thead>
+            <tbody id="members-list-body"></tbody>
+          </table>
+          <p class="empty-note" id="members-list-empty" hidden>Chưa có thành viên nào đăng nhập.</p>
+
+          <div id="member-detail-panel" hidden style="margin-top:20px;border-top:1px solid var(--card-border);padding-top:20px;">
+            <div class="panel-head">
+              <h4 id="member-detail-title" style="margin:0;font-size:1rem;"></h4>
+              <button class="back-link" id="btn-member-detail-close">← Đóng</button>
+            </div>
+            <table class="data-table" id="member-purchases-table">
+              <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Số tiền</th><th>Hình thức</th><th>Thời điểm</th></tr></thead>
+              <tbody id="member-purchases-body"></tbody>
+            </table>
+            <p class="empty-note" id="member-purchases-empty" hidden>Thành viên này chưa mua/dùng sản phẩm nào.</p>
+          </div>
         </div>
       </div>
 

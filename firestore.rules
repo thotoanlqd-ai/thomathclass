@@ -1,0 +1,75 @@
+// =========================================================
+// LUẬT BẢO MẬT FIRESTORE — ThoMathClass
+// =========================================================
+// File này được deploy tự động bằng Firebase CLI:
+//   firebase deploy --only firestore:rules
+// KHÔNG cần copy-paste tay vào Firebase Console nữa.
+// ADMIN_UID phải luôn khớp với ADMIN_UID trong firebase-config.js và functions/index.js.
+// =========================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // roster: danh sách công khai (chỉ tên + lớp), ai cũng xem được
+    // nhưng CHỈ giáo viên mới được thêm/sửa/xoá
+    match /roster/{studentId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+    }
+
+    // students: dữ liệu riêng tư (điểm số, nhận xét)
+    // chỉ chính học sinh đó (đã đăng nhập đúng tài khoản) hoặc giáo viên mới đọc được
+    // chỉ giáo viên mới được ghi/sửa
+    match /students/{studentId} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == studentId || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
+      allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+    }
+
+    // products: thông tin công khai của sản phẩm (tiêu đề, mô tả, giá, tag...)
+    // ai cũng xem được (để hiện công khai trên web), chỉ giáo viên mới thêm/sửa/xoá
+    // KHÔNG chứa link tải thật — link tải nằm ở subcollection "private" bên dưới
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+
+      // private/content: link tải / link Azota thật.
+      // Chỉ đọc được nếu là giáo viên, HOẶC thành viên đó đã có bản ghi mua
+      // (members/{uid}/purchases/{productId}) — tức đã mua hoặc đã dùng lượt miễn phí.
+      match /private/{docId} {
+        allow read: if request.auth != null &&
+                       (request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72" ||
+                        exists(/databases/$(database)/documents/members/$(request.auth.uid)/purchases/$(productId)));
+        allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+      }
+    }
+
+    // members: hồ sơ thành viên (học sinh trong lớp + khách hàng đăng ký ngoài).
+    // Mỗi người tự đọc/ghi hồ sơ của chính mình (để cập nhật lastLoginAt/loginCount
+    // ngay lúc đăng nhập). Giáo viên đọc được tất cả để xem mục "Quản lý thành viên".
+    match /members/{uid} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == uid || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
+      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // purchases: lịch sử đã mua / đã dùng miễn phí sản phẩm nào.
+      // CHỈ Cloud Functions (dùng Admin SDK, không qua rules) mới được ghi —
+      // để không ai tự ghi giả "đã mua" mà chưa thanh toán thật.
+      match /purchases/{productId} {
+        allow read: if request.auth != null &&
+                       (request.auth.uid == uid || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
+        allow write: if false;
+      }
+    }
+
+    // orders: trạng thái giao dịch thanh toán payOS (pending/paid).
+    // CHỈ Cloud Functions mới được tạo/sửa. Chủ đơn hàng hoặc giáo viên mới đọc được,
+    // để trang web có thể lắng nghe realtime xem đơn đã thanh toán xong chưa.
+    match /orders/{orderCode} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == resource.data.uid || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
+      allow write: if false;
+    }
+  }
+}
