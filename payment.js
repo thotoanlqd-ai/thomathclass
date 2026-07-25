@@ -85,11 +85,19 @@ function showQrPayment(data, product) {
   const checkoutLink = document.getElementById("payment-checkout-link");
   if (checkoutLink) checkoutLink.href = data.checkoutUrl || "#";
 
-  const canvas = document.getElementById("payment-qr-canvas");
-  if (canvas && window.QRCode && data.qrCode) {
-    QRCode.toCanvas(canvas, data.qrCode, { width: 220, margin: 1 }, (err) => {
-      if (err) console.error("Vẽ QR lỗi:", err);
-    });
+  const qrContainer = document.getElementById("payment-qr-canvas");
+  if (qrContainer && window.QRCode && data.qrCode) {
+    qrContainer.innerHTML = ""; // xoá QR cũ (nếu có) trước khi vẽ QR mới
+    try {
+      new QRCode(qrContainer, {
+        text: data.qrCode,
+        width: 220,
+        height: 220,
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch (err) {
+      console.error("Vẽ QR lỗi:", err);
+    }
   }
 
   if (currentOrderUnsub) currentOrderUnsub();

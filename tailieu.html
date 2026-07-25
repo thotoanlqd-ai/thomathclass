@@ -165,7 +165,7 @@
     <div id="payment-state-qr" hidden>
       <p class="modal-product">Quét mã QR bằng app ngân hàng để thanh toán. Trang sẽ tự cập nhật ngay khi nhận được tiền, không cần bấm gì thêm.</p>
       <div style="text-align:center;margin-bottom:16px;">
-        <canvas id="payment-qr-canvas"></canvas>
+        <div id="payment-qr-canvas"></div>
       </div>
       <div class="bank-box">
         <div><span class="label">Số tiền</span><span class="value" id="payment-amount">—</span></div>
@@ -200,7 +200,7 @@
   const PRODUCT_CATEGORY = "tailieu";
   const BUY_LABEL = "Mua ngay";
 </script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
