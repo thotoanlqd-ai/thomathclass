@@ -37,7 +37,7 @@ function getPayOS() {
 // claimProduct — gọi từ payment.js mỗi khi khách bấm mua
 // ---------------------------------------------------------
 exports.claimProduct = onCall(
-  { region: REGION, secrets: [payosClientId, payosApiKey, payosChecksumKey] },
+  { region: REGION, secrets: [payosClientId, payosApiKey, payosChecksumKey], invoker: "public" },
   async (request) => {
     const auth = request.auth;
     if (!auth) {
