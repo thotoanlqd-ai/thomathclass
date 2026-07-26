@@ -84,9 +84,10 @@ function getFilteredProducts() {
 }
 
 // Gọi từ payment.js ngay sau khi 1 sản phẩm được cấp quyền (mua xong hoặc claim miễn phí),
-// để card đổi trạng thái ngay mà không cần tải lại trang.
-function markProductOwned(productId) {
-  purchasesMap[productId] = purchasesMap[productId] || { purchasedAt: new Date() };
+// để card đổi trạng thái ngay mà không cần tải lại trang. extra: dữ liệu bổ sung merge vào
+// (vd { zaloGroupLink } để card khóa học hiện luôn nút vào nhóm Zalo, không cần tải lại trang).
+function markProductOwned(productId, extra) {
+  purchasesMap[productId] = Object.assign({ purchasedAt: new Date() }, purchasesMap[productId], extra || {});
   renderProductGrid(getFilteredProducts());
 }
 
@@ -171,8 +172,10 @@ function renderProductGrid(products) {
 
     const iconSvg = CATEGORY_ICONS[PRODUCT_CATEGORY] || CATEGORY_ICONS.tailieu;
     const owned = !!purchasesMap[p.id];
+    const isCourse = PRODUCT_CATEGORY === "khoahoc";
     const actionHtml = owned
-      ? '<button class="btn btn-primary btn-small" data-action="open">Xem/Tải nội dung</button>'
+      ? '<button class="btn btn-primary btn-small" data-action="open">Xem/Tải nội dung</button>' +
+        (isCourse ? '<a href="#" target="_blank" rel="noopener" class="btn btn-outline btn-small" data-action="zalo-group" hidden>Tham gia nhóm Zalo</a>' : "")
       : '<button class="btn btn-primary btn-small" data-action="buy">' + escapeHtmlP(BUY_LABEL) + "</button>";
 
     card.innerHTML = `
@@ -182,12 +185,21 @@ function renderProductGrid(products) {
         <p>${escapeHtmlP(p.description || "")}</p>
         <div class="product-foot">
           <span class="price">${escapeHtmlP(p.price || "")}</span>
-          ${actionHtml}
+          <div class="product-actions" style="display:flex;gap:8px;flex-wrap:wrap;">${actionHtml}</div>
         </div>
       </div>
     `;
 
-    const actionBtn = card.querySelector("[data-action]");
+    if (owned && isCourse) {
+      const zaloGroupLink = purchasesMap[p.id] && purchasesMap[p.id].zaloGroupLink;
+      const zaloBtn = card.querySelector('[data-action="zalo-group"]');
+      if (zaloBtn && zaloGroupLink) {
+        zaloBtn.href = zaloGroupLink;
+        zaloBtn.hidden = false;
+      }
+    }
+
+    const actionBtn = card.querySelector('[data-action="open"], [data-action="buy"]');
     if (owned) {
       actionBtn.addEventListener("click", () => openOwnedContent(p, actionBtn));
     } else {

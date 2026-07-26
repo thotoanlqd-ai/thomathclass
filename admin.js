@@ -923,6 +923,8 @@ function resetContentForm() {
   document.getElementById("content-tag").value = "";
   document.getElementById("content-link-url").value = "";
   document.getElementById("content-link-label").value = "";
+  document.getElementById("content-zalo-link").value = "";
+  document.getElementById("content-zalo-row").hidden = currentContentCategory !== "khoahoc";
   document.getElementById("content-error").textContent = "";
   document.getElementById("btn-content-save").textContent = "Thêm mới";
   document.getElementById("btn-content-cancel-edit").hidden = true;
@@ -981,6 +983,8 @@ function editContentItem(id, data) {
   document.getElementById("content-tag").value = data.tag || "";
   document.getElementById("content-link-url").value = "";
   document.getElementById("content-link-label").value = "";
+  document.getElementById("content-zalo-link").value = "";
+  document.getElementById("content-zalo-row").hidden = currentContentCategory !== "khoahoc";
   document.getElementById("content-error").textContent = "";
   document.getElementById("btn-content-save").textContent = "Cập nhật";
   document.getElementById("btn-content-cancel-edit").hidden = false;
@@ -996,6 +1000,7 @@ function editContentItem(id, data) {
       if (snap.exists && currentEditingContentId === id) {
         document.getElementById("content-link-url").value = snap.data().linkUrl || "";
         document.getElementById("content-link-label").value = snap.data().linkLabel || "";
+        document.getElementById("content-zalo-link").value = snap.data().zaloGroupLink || "";
       }
     })
     .catch((err) => console.error(err));
@@ -1022,6 +1027,7 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
   const tag = document.getElementById("content-tag").value.trim();
   const linkUrl = document.getElementById("content-link-url").value.trim();
   const linkLabel = document.getElementById("content-link-label").value.trim();
+  const zaloGroupLink = document.getElementById("content-zalo-link").value.trim();
   const errorEl = document.getElementById("content-error");
   errorEl.textContent = "";
 
@@ -1050,7 +1056,7 @@ document.getElementById("btn-content-save").addEventListener("click", () => {
       .doc(productId)
       .collection("private")
       .doc("content")
-      .set({ linkUrl, linkLabel });
+      .set({ linkUrl, linkLabel, zaloGroupLink });
   }
 
   errorEl.textContent = "Đang lưu...";

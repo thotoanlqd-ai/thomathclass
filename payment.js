@@ -133,6 +133,21 @@ function showGrantedContent(product) {
       } else {
         linkBtn.hidden = true;
       }
+
+      const zaloGroupLink = snap.exists ? snap.data().zaloGroupLink : null;
+      const zaloBtn = document.getElementById("payment-zalo-group-link");
+      if (zaloBtn) {
+        if (zaloGroupLink) {
+          zaloBtn.href = zaloGroupLink;
+          zaloBtn.hidden = false;
+        } else {
+          zaloBtn.hidden = true;
+        }
+      }
+
+      if (zaloGroupLink && typeof markProductOwned === "function") {
+        markProductOwned(product.id, { zaloGroupLink });
+      }
     })
     .catch((err) => console.error(err));
 

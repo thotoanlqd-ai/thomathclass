@@ -36,6 +36,17 @@ function getPayOS() {
   return new PayOS(payosClientId.value(), payosApiKey.value(), payosChecksumKey.value());
 }
 
+// Khóa học online có sẵn 1 nhóm Zalo riêng (field zaloGroupLink ở products/{id}/private/content).
+// Gắn thêm field này vào purchase record để tự động hiện link nhóm Zalo sau khi mua/claim thành công.
+async function withZaloGroupLink(productId, category, purchaseData) {
+  if (category !== "khoahoc") return purchaseData;
+  const privateSnap = await db.collection("products").doc(productId).collection("private").doc("content").get();
+  if (privateSnap.exists && privateSnap.data().zaloGroupLink) {
+    purchaseData.zaloGroupLink = privateSnap.data().zaloGroupLink;
+  }
+  return purchaseData;
+}
+
 // ---------------------------------------------------------
 // claimProduct — gọi từ payment.js mỗi khi khách bấm mua
 // ---------------------------------------------------------
@@ -72,26 +83,30 @@ exports.claimProduct = onCall(
 
     // Tài khoản giáo viên: luôn được cấp quyền ngay, không phải thanh toán
     if (uid === ADMIN_UID) {
-      await purchaseRef.set({
-        title: product.title || "",
-        category: product.category || "",
-        amountVnd: 0,
-        method: "admin",
-        purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await purchaseRef.set(
+        await withZaloGroupLink(productId, product.category, {
+          title: product.title || "",
+          category: product.category || "",
+          amountVnd: 0,
+          method: "admin",
+          purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      );
       return { granted: true, alreadyOwned: false };
     }
 
     const amountVnd = Number(product.amountVnd) || 0;
 
     if (amountVnd <= 0) {
-      await purchaseRef.set({
-        title: product.title || "",
-        category: product.category || "",
-        amountVnd: 0,
-        method: "free",
-        purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await purchaseRef.set(
+        await withZaloGroupLink(productId, product.category, {
+          title: product.title || "",
+          category: product.category || "",
+          amountVnd: 0,
+          method: "free",
+          purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      );
       return { granted: true, alreadyOwned: false };
     }
 
@@ -171,14 +186,16 @@ exports.payosWebhook = onRequest(
         .doc(order.uid)
         .collection("purchases")
         .doc(order.productId)
-        .set({
-          title: order.productTitle || "",
-          category: order.productCategory || "",
-          amountVnd: order.amountVnd,
-          method: "payos",
-          orderCode,
-          purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        .set(
+          await withZaloGroupLink(order.productId, order.productCategory, {
+            title: order.productTitle || "",
+            category: order.productCategory || "",
+            amountVnd: order.amountVnd,
+            method: "payos",
+            orderCode,
+            purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+          })
+        );
 
       res.status(200).send("ok");
     } catch (err) {
