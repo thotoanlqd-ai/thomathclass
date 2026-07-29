@@ -183,6 +183,13 @@
                 <thead><tr><th>Ngày</th><th>Nội dung</th><th></th></tr></thead>
                 <tbody id="comment-data-body"></tbody>
               </table>
+
+              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí riêng (chỉ áp dụng cho lần tính học phí tiếp theo, dùng xong tự xoá)</h4>
+              <div class="admin-row">
+                <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ)</label><input type="number" id="tuition-override" min="0" step="10000" placeholder="Vd: 500000" /></div>
+                <button class="btn btn-outline btn-small" id="btn-save-tuition-override">Lưu</button>
+              </div>
+              <p class="field-error" id="tuition-override-status"></p>
             </div>
           </div>
 
@@ -270,6 +277,24 @@
           <p class="field-error" id="delete-status"></p>
         </div>
 
+        <!-- Học phí -->
+        <div class="panel" style="margin-top:22px;">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">💰 Học phí</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Hệ thống tự tạo bản ghi học phí ngày 27 hàng tháng cho 3 lớp học phí tự động và tự hiện QR payOS cho phụ huynh. Bấm vào ô "chưa đóng" để tick tay khi nhận tiền mặt/chuyển khoản trực tiếp.</p>
+
+          <div class="filter-bar" id="tuition-tabs"></div>
+
+          <div id="tuition-summary" style="margin:16px 0;font-size:0.9rem;color:var(--muted);"></div>
+
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="tuition-table">
+              <thead><tr id="tuition-table-head"><th>Học sinh</th></tr></thead>
+              <tbody id="tuition-table-body"></tbody>
+            </table>
+          </div>
+          <p class="empty-note" id="tuition-table-empty" hidden>Lớp này chưa có bản ghi học phí nào.</p>
+        </div>
+
         <!-- Quản lý thành viên -->
         <div class="panel" style="margin-top:22px;">
           <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Quản lý thành viên</h3>
@@ -291,6 +316,23 @@
               <tbody id="member-purchases-body"></tbody>
             </table>
             <p class="empty-note" id="member-purchases-empty" hidden>Thành viên này chưa mua/dùng sản phẩm nào.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL: tick tay đã đóng học phí -->
+      <div class="modal-overlay" id="tuition-manual-modal">
+        <div class="modal">
+          <button class="modal-close" id="tuition-manual-modal-close" aria-label="Đóng">&times;</button>
+          <p class="eyebrow">Đánh dấu đã đóng học phí</p>
+          <h3 id="tuition-manual-title">—</h3>
+          <div class="field">
+            <label for="tuition-manual-note">Ghi chú (vd: tiền mặt, chuyển khoản tay...)</label>
+            <input type="text" id="tuition-manual-note" placeholder="Vd: Tiền mặt" />
+          </div>
+          <p class="field-error" id="tuition-manual-error"></p>
+          <div class="modal-actions">
+            <button class="btn btn-primary btn-small" id="btn-tuition-manual-confirm">Xác nhận đã đóng</button>
           </div>
         </div>
       </div>

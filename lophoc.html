@@ -81,6 +81,11 @@
           <button class="btn btn-outline btn-small" id="btn-logout">Đăng xuất</button>
         </div>
 
+        <div class="dash-section" id="tuition-section" hidden>
+          <h3>Học phí</h3>
+          <div id="tuition-list"></div>
+        </div>
+
         <div class="dash-section">
           <h3>Điểm số</h3>
           <table class="score-table" id="score-table">
@@ -172,14 +177,52 @@
   </div>
 </div>
 
+<!-- MODAL: đóng học phí tự động payOS -->
+<div class="modal-overlay" id="tuition-modal">
+  <div class="modal">
+    <button class="modal-close" id="tuition-modal-close" aria-label="Đóng">&times;</button>
+    <p class="eyebrow">Đóng học phí</p>
+    <h3 id="tuition-product-name">Học phí</h3>
+
+    <div id="tuition-state-loading">
+      <p class="modal-product">Đang xử lý...</p>
+    </div>
+
+    <div id="tuition-state-qr" hidden>
+      <p class="modal-product">Quét mã QR bằng app ngân hàng để thanh toán. Trang sẽ tự cập nhật ngay khi nhận được tiền, không cần bấm gì thêm.</p>
+      <div style="text-align:center;margin-bottom:16px;">
+        <div id="tuition-qr-canvas"></div>
+      </div>
+      <div class="bank-box">
+        <div><span class="label">Số tiền</span><span class="value" id="tuition-amount">—</span></div>
+      </div>
+      <p class="field-error" id="tuition-status-text" style="color:var(--muted);"></p>
+      <p style="margin-top:8px;">
+        <a href="#" id="tuition-checkout-link" target="_blank" rel="noopener" style="font-size:0.85rem;color:var(--muted);text-decoration:underline;">Không quét được QR? Mở trang thanh toán</a>
+      </p>
+    </div>
+
+    <div id="tuition-state-paid" hidden>
+      <p class="modal-product">✓ Đã ghi nhận đóng học phí thành công! Cảm ơn phụ huynh/em.</p>
+    </div>
+
+    <div id="tuition-state-error" hidden>
+      <p class="field-error" id="tuition-error-text"></p>
+    </div>
+  </div>
+</div>
+
 <!-- Firebase SDK (compat) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-functions-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="script.js"></script>
 <script src="members.js"></script>
 <script src="lophoc.js"></script>
+<script src="tuition.js"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

@@ -116,6 +116,7 @@ function initAdminPanel() {
   populateClassSelects();
   initContentManager();
   loadMembersList();
+  initTuitionPanel();
 }
 
 function populateClassSelects() {
@@ -223,9 +224,38 @@ function loadStudentEditor(uid) {
       currentStudentData = doc.exists ? doc.data() : { scores: [], comments: [] };
       renderScoreTable();
       renderCommentTable();
+      document.getElementById("tuition-override").value =
+        currentStudentData.nextMonthTuitionOverride === undefined || currentStudentData.nextMonthTuitionOverride === null
+          ? ""
+          : currentStudentData.nextMonthTuitionOverride;
+      document.getElementById("tuition-override-status").textContent = "";
       document.getElementById("student-editor").hidden = false;
     });
 }
+
+document.getElementById("btn-save-tuition-override").addEventListener("click", () => {
+  const statusEl = document.getElementById("tuition-override-status");
+  if (!currentStudentUid) return;
+  const raw = document.getElementById("tuition-override").value.trim();
+  if (raw !== "" && (isNaN(Number(raw)) || Number(raw) < 0)) {
+    statusEl.textContent = "Số tiền phải là số không âm, hoặc để trống để dùng mặc định.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  const update =
+    raw === ""
+      ? { nextMonthTuitionOverride: firebase.firestore.FieldValue.delete() }
+      : { nextMonthTuitionOverride: Number(raw) };
+  db.collection("students")
+    .doc(currentStudentUid)
+    .set(update, { merge: true })
+    .then(() => {
+      statusEl.textContent = "✓ Đã lưu.";
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
 
 // ---------- Hàm dùng chung: tạo 1 tài khoản học sinh ----------
 // Trả về Promise resolve({ok:true}) hoặc resolve({ok:false, error}) — không reject,
@@ -1186,4 +1216,167 @@ function showMemberDetail(uid, memberData) {
 
 document.getElementById("btn-member-detail-close").addEventListener("click", () => {
   document.getElementById("member-detail-panel").hidden = true;
+});
+
+// ==========================================================
+// HỌC PHÍ TỰ ĐỘNG — 3 lớp Thầy Thọ vs 2k9/2k10/2k11
+// ==========================================================
+const TUITION_CLASS_IDS = ["tho-2k9", "tho-2k10", "tho-2k11"];
+let currentTuitionClassId = TUITION_CLASS_IDS[0];
+let tuitionManualTarget = null;
+
+function tuitionMonthLabelAdmin(month) {
+  const parts = (month || "").split("-");
+  if (parts.length !== 2) return month || "";
+  return Number(parts[1]) + "/" + parts[0];
+}
+
+function currentMonthKeyAdmin() {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+
+function initTuitionPanel() {
+  const tabsEl = document.getElementById("tuition-tabs");
+  tabsEl.innerHTML = "";
+  CLASS_LIST.filter((c) => TUITION_CLASS_IDS.indexOf(c.id) !== -1).forEach((c, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "filter-btn" + (idx === 0 ? " active" : "");
+    btn.textContent = c.name;
+    btn.addEventListener("click", () => {
+      tabsEl.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTuitionClassId = c.id;
+      loadTuitionTable(c.id);
+    });
+    tabsEl.appendChild(btn);
+  });
+  currentTuitionClassId = TUITION_CLASS_IDS[0];
+  loadTuitionTable(currentTuitionClassId);
+}
+
+function loadTuitionTable(classId) {
+  const summaryEl = document.getElementById("tuition-summary");
+  const headRow = document.getElementById("tuition-table-head");
+  const body = document.getElementById("tuition-table-body");
+  const emptyNote = document.getElementById("tuition-table-empty");
+  summaryEl.textContent = "Đang tải...";
+  body.innerHTML = "";
+  emptyNote.hidden = true;
+
+  Promise.all([
+    db.collection("roster").where("classId", "==", classId).orderBy("order").get(),
+    db.collection("tuition").where("classId", "==", classId).get(),
+  ])
+    .then(([rosterSnap, tuitionSnap]) => {
+      const students = rosterSnap.docs.map((d) => ({ uid: d.id, fullName: d.data().fullName }));
+      const byStudentMonth = {}; // uid -> month -> {id, ...data}
+      const months = new Set();
+      tuitionSnap.forEach((doc) => {
+        const d = doc.data();
+        months.add(d.month);
+        byStudentMonth[d.studentId] = byStudentMonth[d.studentId] || {};
+        byStudentMonth[d.studentId][d.month] = Object.assign({ id: doc.id }, d);
+      });
+      const sortedMonths = Array.from(months).sort();
+
+      if (!students.length || !sortedMonths.length) {
+        emptyNote.hidden = false;
+        summaryEl.textContent = "";
+        headRow.innerHTML = "<th>Học sinh</th>";
+        return;
+      }
+      emptyNote.hidden = true;
+
+      headRow.innerHTML = "<th>Học sinh</th>" + sortedMonths.map((m) => `<th>${escapeHtml(tuitionMonthLabelAdmin(m))}</th>`).join("");
+
+      const nowMonth = currentMonthKeyAdmin();
+      let paidCount = 0;
+      let unpaidCount = 0;
+      let totalCollected = 0;
+      students.forEach((s) => {
+        const rec = (byStudentMonth[s.uid] || {})[nowMonth];
+        if (rec) {
+          if (rec.status === "đã đóng") {
+            paidCount++;
+            totalCollected += Number(rec.amount || 0);
+          } else {
+            unpaidCount++;
+          }
+        }
+      });
+      summaryEl.innerHTML =
+        `Tháng ${escapeHtml(tuitionMonthLabelAdmin(nowMonth))}: <strong>${paidCount}</strong> đã đóng / ` +
+        `<strong>${unpaidCount}</strong> chưa đóng — Tổng đã thu: <strong>${escapeHtml(Number(totalCollected).toLocaleString("vi-VN"))}đ</strong>`;
+
+      body.innerHTML = "";
+      students.forEach((s) => {
+        const tr = document.createElement("tr");
+        let rowHtml = `<td>${escapeHtml(s.fullName)}</td>`;
+        sortedMonths.forEach((m) => {
+          const rec = (byStudentMonth[s.uid] || {})[m];
+          if (!rec) {
+            rowHtml += `<td style="text-align:center;color:var(--muted);">—</td>`;
+          } else if (rec.status === "đã đóng") {
+            const warn = rec.possibleDuplicate
+              ? ' <span title="Có thể nhận trùng tiền cho tháng này, kiểm tra lại!">⚠️</span>'
+              : "";
+            rowHtml += `<td style="text-align:center;color:var(--chalk);">✓${warn}</td>`;
+          } else {
+            rowHtml += `<td style="text-align:center;"><button class="mini-btn" data-uid="${s.uid}" data-month="${m}">chưa đóng</button></td>`;
+          }
+        });
+        tr.innerHTML = rowHtml;
+        body.appendChild(tr);
+      });
+
+      body.querySelectorAll("button[data-uid]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const uid = btn.dataset.uid;
+          const month = btn.dataset.month;
+          const rec = (byStudentMonth[uid] || {})[month];
+          const student = students.find((s) => s.uid === uid);
+          if (rec) openTuitionManualModal(rec.id, student ? student.fullName : uid, month);
+        });
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      summaryEl.textContent = "Không tải được: " + err.message;
+    });
+}
+
+function openTuitionManualModal(tuitionDocId, studentName, month) {
+  tuitionManualTarget = tuitionDocId;
+  document.getElementById("tuition-manual-title").textContent = studentName + " — tháng " + tuitionMonthLabelAdmin(month);
+  document.getElementById("tuition-manual-note").value = "";
+  document.getElementById("tuition-manual-error").textContent = "";
+  document.getElementById("tuition-manual-modal").classList.add("open");
+}
+
+document.getElementById("tuition-manual-modal-close").addEventListener("click", () => {
+  document.getElementById("tuition-manual-modal").classList.remove("open");
+});
+
+document.getElementById("btn-tuition-manual-confirm").addEventListener("click", () => {
+  if (!tuitionManualTarget) return;
+  const note = document.getElementById("tuition-manual-note").value.trim();
+  const errorEl = document.getElementById("tuition-manual-error");
+  errorEl.textContent = "Đang lưu...";
+  db.collection("tuition")
+    .doc(tuitionManualTarget)
+    .update({
+      status: "đã đóng",
+      paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+      paidMethod: "manual",
+      paidNote: note,
+    })
+    .then(() => {
+      document.getElementById("tuition-manual-modal").classList.remove("open");
+      tuitionManualTarget = null;
+      loadTuitionTable(currentTuitionClassId);
+    })
+    .catch((err) => {
+      errorEl.textContent = "Lỗi: " + err.message;
+    });
 });
