@@ -103,6 +103,7 @@ exports.generateMonthlyTuition = onSchedule(
         month,
         amount,
         status: "chưa đóng",
+        note: null,
         currentOrderCode: null,
         currentQrCode: null,
         currentCheckoutUrl: null,

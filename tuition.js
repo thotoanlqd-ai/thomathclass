@@ -70,12 +70,15 @@ function renderTuitionList(items) {
   tuitionList.innerHTML = "";
   items.forEach((item) => {
     const label = "Học phí tháng " + tuitionMonthLabel(item.month);
+    const noteHtml = item.note
+      ? `<br><span style="font-size:0.82rem;color:var(--muted);">${escapeHtmlTuition(item.note)}</span>`
+      : "";
     const row = document.createElement("div");
     row.className = "tuition-row";
     row.style.cssText =
       "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;margin-bottom:10px;flex-wrap:wrap;";
     row.innerHTML = `
-      <span style="font-size:0.92rem;">${escapeHtmlTuition(label)} — ${escapeHtmlTuition(formatVndTuition(item.amount))}</span>
+      <span style="font-size:0.92rem;">${escapeHtmlTuition(label)} — ${escapeHtmlTuition(formatVndTuition(item.amount))}${noteHtml}</span>
       <button class="btn btn-primary btn-small" data-action="pay">Đóng học phí tháng ${escapeHtmlTuition(tuitionMonthLabel(item.month))}</button>
     `;
     row.querySelector('[data-action="pay"]').addEventListener("click", () => openTuitionPayment(item));
@@ -110,6 +113,7 @@ function closeTuitionModal() {
 function openTuitionPayment(item) {
   document.getElementById("tuition-product-name").textContent = "Học phí tháng " + tuitionMonthLabel(item.month);
   document.getElementById("tuition-amount").textContent = formatVndTuition(item.amount);
+  document.getElementById("tuition-note").textContent = item.note || "";
   openTuitionModal();
   setTuitionState("loading");
 
