@@ -158,6 +158,8 @@
               </div>
             </div>
 
+            <div id="student-avatar-list" style="margin-bottom:18px;"></div>
+
             <div id="student-editor" hidden>
               <h4 style="margin:18px 0 10px;font-size:0.92rem;">Thêm điểm số</h4>
               <div class="admin-row">
@@ -193,6 +195,41 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- Nhật ký lớp học -->
+        <div class="panel" style="margin-top:22px;" id="journal-form">
+          <h3 style="margin:0 0 6px;font-size:1.05rem;">📓 Nhật ký lớp học</h3>
+          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Đăng cập nhật (chữ + ảnh) cho phụ huynh/học sinh xem trong trang cá nhân của các em. Áp dụng cho mọi lớp, kể cả lớp mới tạo sau này.</p>
+
+          <div class="field" style="max-width:320px;">
+            <label>Chọn lớp</label>
+            <select id="journal-class"></select>
+          </div>
+
+          <div id="journal-edit-banner" hidden style="background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;font-size:0.86rem;margin-bottom:14px;align-items:center;justify-content:space-between;gap:10px;">
+            <span>Đang sửa 1 bài viết đã đăng.</span>
+            <button class="back-link" id="btn-journal-cancel-edit">Huỷ sửa</button>
+          </div>
+
+          <div class="field">
+            <label>Nội dung</label>
+            <textarea id="journal-content" rows="4" placeholder="Hôm nay lớp học..."></textarea>
+          </div>
+
+          <div id="journal-kept-images" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+
+          <div class="admin-row">
+            <div class="field">
+              <label>Thêm ảnh (có thể chọn nhiều)</label>
+              <input type="file" id="journal-images" accept="image/*" multiple />
+            </div>
+            <button class="btn btn-primary btn-small" id="btn-journal-post">Đăng bài</button>
+          </div>
+          <p class="field-error" id="journal-status"></p>
+
+          <h4 style="margin:22px 0 10px;font-size:0.92rem;">Các bài đã đăng</h4>
+          <div id="journal-admin-list"></div>
         </div>
 
         <!-- Nhập danh sách hàng loạt từ file Word/Excel -->
@@ -356,7 +393,9 @@
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="image-compress.js"></script>
 <script src="admin.js"></script>
 <script>
   if ("serviceWorker" in navigator) {

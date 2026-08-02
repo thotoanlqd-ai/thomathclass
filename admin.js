@@ -125,6 +125,7 @@ function populateClassSelects() {
     document.getElementById("pick-class"),
     document.getElementById("export-class"),
     document.getElementById("delete-class"),
+    document.getElementById("journal-class"),
   ];
   selects.forEach((sel) => {
     sel.innerHTML = "";
@@ -138,6 +139,7 @@ function populateClassSelects() {
   loadStudentPicker(document.getElementById("pick-class").value);
   renderBulkClassGrid();
   loadDeleteList();
+  renderJournalAdminList(document.getElementById("journal-class").value);
 }
 
 // ---------- Lưới chọn lớp cho khu vực "Thêm học sinh hàng loạt" ----------
@@ -196,13 +198,16 @@ function loadStudentPicker(classId) {
     .get()
     .then((snap) => {
       pickStudent.innerHTML = '<option value="">— Chọn học sinh —</option>';
+      const students = [];
       snap.forEach((doc) => {
         const d = doc.data();
+        students.push({ uid: doc.id, fullName: d.fullName });
         const opt = document.createElement("option");
         opt.value = doc.id;
         opt.textContent = d.fullName;
         pickStudent.appendChild(opt);
       });
+      renderStudentAvatarList(students);
     });
 }
 
@@ -410,6 +415,270 @@ function deleteComment(idx) {
       currentStudentData.comments = comments;
       renderCommentTable();
     });
+}
+
+// ==========================================================
+// ẢNH ĐẠI DIỆN HỌC SINH — chỉ admin xem/tải lên (studentAvatars/{uid})
+// ==========================================================
+function renderStudentAvatarList(students) {
+  const wrap = document.getElementById("student-avatar-list");
+  wrap.innerHTML = "";
+  students.forEach((s) => {
+    const row = document.createElement("div");
+    row.className = "avatar-row";
+    row.innerHTML = `
+      <img class="avatar-thumb" id="avatar-thumb-${s.uid}" alt="" hidden />
+      <span class="avatar-thumb-empty" id="avatar-thumb-empty-${s.uid}">${escapeHtml((s.fullName || "?").charAt(0).toUpperCase())}</span>
+      <button type="button" class="link-btn" data-uid="${s.uid}">${escapeHtml(s.fullName)}</button>
+      <label class="btn btn-outline btn-small avatar-upload-btn">
+        Đổi ảnh
+        <input type="file" accept="image/*" hidden />
+      </label>
+      <span class="field-error" id="avatar-status-${s.uid}"></span>
+    `;
+    row.querySelector(".link-btn").addEventListener("click", () => {
+      document.getElementById("pick-student").value = s.uid;
+      currentStudentUid = s.uid;
+      loadStudentEditor(s.uid);
+    });
+    row.querySelector('input[type="file"]').addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (file) uploadStudentAvatar(s.uid, file);
+    });
+    wrap.appendChild(row);
+
+    db.collection("studentAvatars")
+      .doc(s.uid)
+      .get()
+      .then((doc) => {
+        if (doc.exists && doc.data().avatarUrl) {
+          showAvatarThumb(s.uid, doc.data().avatarUrl);
+        }
+      })
+      .catch((err) => console.error("Không tải được ảnh đại diện:", err));
+  });
+}
+
+function showAvatarThumb(uid, url) {
+  const img = document.getElementById("avatar-thumb-" + uid);
+  const empty = document.getElementById("avatar-thumb-empty-" + uid);
+  if (!img || !empty) return;
+  img.src = url;
+  img.hidden = false;
+  empty.hidden = true;
+}
+
+async function uploadStudentAvatar(uid, file) {
+  const statusEl = document.getElementById("avatar-status-" + uid);
+  statusEl.textContent = "Đang tải lên...";
+  try {
+    const blob = await compressImageFile(file, 480, 0.8);
+    const ref = storage.ref().child("studentAvatars/" + uid + "/avatar.jpg");
+    await ref.put(blob);
+    const url = await ref.getDownloadURL();
+    await db.collection("studentAvatars").doc(uid).set({
+      avatarUrl: url,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showAvatarThumb(uid, url);
+    statusEl.textContent = "✓ Đã cập nhật.";
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi: " + err.message;
+  }
+}
+
+// ==========================================================
+// NHẬT KÝ LỚP HỌC — collection classJournal, áp dụng mọi lớp trong CLASS_LIST
+// ==========================================================
+let journalEditingId = null;
+let journalOriginalImages = [];
+let journalKeptImages = [];
+
+document.getElementById("journal-class").addEventListener("change", (e) => {
+  cancelEditJournalEntry();
+  renderJournalAdminList(e.target.value);
+});
+
+function renderJournalAdminList(classId) {
+  const wrap = document.getElementById("journal-admin-list");
+  if (!classId) {
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.innerHTML = '<p class="empty-note">Đang tải...</p>';
+  db.collection("classJournal")
+    .where("classId", "==", classId)
+    .get()
+    .then((snap) => {
+      const entries = [];
+      snap.forEach((doc) => entries.push(Object.assign({ id: doc.id }, doc.data())));
+      entries.sort((a, b) => {
+        const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+        return tb - ta;
+      });
+
+      wrap.innerHTML = "";
+      if (!entries.length) {
+        wrap.innerHTML = '<p class="empty-note">Lớp này chưa có bài nhật ký nào.</p>';
+        return;
+      }
+      entries.forEach((entry) => {
+        const dateStr = entry.createdAt ? new Date(entry.createdAt.toMillis()).toLocaleString("vi-VN") : "";
+        const imagesHtml = (entry.images || [])
+          .map((url) => `<img src="${escapeHtml(url)}" class="journal-thumb" />`)
+          .join("");
+        const div = document.createElement("div");
+        div.className = "journal-post";
+        div.innerHTML = `
+          <span class="date">${escapeHtml(dateStr)}</span>
+          <p>${escapeHtml(entry.content || "")}</p>
+          <div class="journal-images">${imagesHtml}</div>
+          <div style="margin-top:8px;display:flex;gap:14px;">
+            <button type="button" class="mini-btn" data-action="edit">Sửa</button>
+            <button type="button" class="mini-btn" data-action="delete" style="color:var(--muted);">Xoá</button>
+          </div>
+        `;
+        div.querySelector('[data-action="edit"]').addEventListener("click", () => startEditJournalEntry(entry));
+        div.querySelector('[data-action="delete"]').addEventListener("click", () => deleteJournalEntry(entry));
+        wrap.appendChild(div);
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      wrap.innerHTML = '<p class="field-error">Không tải được: ' + escapeHtml(err.message) + "</p>";
+    });
+}
+
+function startEditJournalEntry(entry) {
+  journalEditingId = entry.id;
+  journalOriginalImages = (entry.images || []).slice();
+  journalKeptImages = (entry.images || []).slice();
+  document.getElementById("journal-class").value = entry.classId;
+  document.getElementById("journal-class").disabled = true;
+  document.getElementById("journal-content").value = entry.content || "";
+  document.getElementById("btn-journal-post").textContent = "Lưu chỉnh sửa";
+  const bannerEl = document.getElementById("journal-edit-banner");
+  bannerEl.hidden = false;
+  bannerEl.style.display = "flex";
+  renderJournalKeptImages();
+  document.getElementById("journal-form").scrollIntoView({ behavior: "smooth" });
+}
+
+function cancelEditJournalEntry() {
+  journalEditingId = null;
+  journalOriginalImages = [];
+  journalKeptImages = [];
+  document.getElementById("journal-class").disabled = false;
+  document.getElementById("journal-content").value = "";
+  document.getElementById("journal-images").value = "";
+  document.getElementById("btn-journal-post").textContent = "Đăng bài";
+  const bannerEl = document.getElementById("journal-edit-banner");
+  bannerEl.hidden = true;
+  bannerEl.style.display = "";
+  document.getElementById("journal-kept-images").innerHTML = "";
+  document.getElementById("journal-status").textContent = "";
+}
+
+document.getElementById("btn-journal-cancel-edit").addEventListener("click", cancelEditJournalEntry);
+
+function renderJournalKeptImages() {
+  const wrap = document.getElementById("journal-kept-images");
+  wrap.innerHTML = "";
+  journalKeptImages.forEach((url, idx) => {
+    const box = document.createElement("div");
+    box.className = "journal-thumb-wrap";
+    box.innerHTML = `<img src="${escapeHtml(url)}" class="journal-thumb" /><button type="button" class="journal-thumb-remove" title="Bỏ ảnh này">×</button>`;
+    box.querySelector("button").addEventListener("click", () => {
+      journalKeptImages.splice(idx, 1);
+      renderJournalKeptImages();
+    });
+    wrap.appendChild(box);
+  });
+}
+
+document.getElementById("btn-journal-post").addEventListener("click", async () => {
+  const classId = document.getElementById("journal-class").value;
+  const content = document.getElementById("journal-content").value.trim();
+  const filesInput = document.getElementById("journal-images");
+  const files = Array.from(filesInput.files || []);
+  const statusEl = document.getElementById("journal-status");
+  const btn = document.getElementById("btn-journal-post");
+
+  if (!content && !files.length && journalKeptImages.length === 0) {
+    statusEl.textContent = "Nhập nội dung hoặc chọn ít nhất 1 ảnh.";
+    return;
+  }
+
+  statusEl.textContent = "Đang đăng...";
+  btn.disabled = true;
+  try {
+    const entryRef = journalEditingId ? db.collection("classJournal").doc(journalEditingId) : db.collection("classJournal").doc();
+
+    const uploadedUrls = [];
+    for (const file of files) {
+      const blob = await compressImageFile(file, 1200, 0.75);
+      const path = "classJournal/" + classId + "/" + entryRef.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
+      const ref = storage.ref().child(path);
+      await ref.put(blob);
+      const url = await ref.getDownloadURL();
+      uploadedUrls.push(url);
+    }
+
+    if (journalEditingId) {
+      const finalImages = journalKeptImages.concat(uploadedUrls);
+      const removed = journalOriginalImages.filter((u) => journalKeptImages.indexOf(u) === -1);
+      await Promise.all(
+        removed.map((url) =>
+          storage
+            .refFromURL(url)
+            .delete()
+            .catch((err) => console.error("Không xoá được ảnh cũ trên Storage:", err))
+        )
+      );
+      await entryRef.update({
+        content,
+        images: finalImages,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await entryRef.set({
+        classId,
+        content,
+        images: uploadedUrls,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    cancelEditJournalEntry();
+    renderJournalAdminList(classId);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi: " + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function deleteJournalEntry(entry) {
+  if (!confirm("Xoá bài nhật ký này? Không thể hoàn tác.")) return;
+  Promise.all(
+    (entry.images || []).map((url) =>
+      storage
+        .refFromURL(url)
+        .delete()
+        .catch((err) => console.error("Không xoá được ảnh trên Storage:", err))
+    )
+  )
+    .then(() => db.collection("classJournal").doc(entry.id).delete())
+    .then(() => {
+      if (journalEditingId === entry.id) cancelEditJournalEntry();
+      renderJournalAdminList(entry.classId);
+    })
+    .catch((err) => alert("Lỗi khi xoá: " + err.message));
 }
 
 // ==========================================================

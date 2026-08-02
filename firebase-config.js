@@ -47,3 +47,7 @@ const db = firebase.firestore();
 // thẻ <script> firebase-functions-compat.js (baigiang/tailieu/khoahoc/azota.html).
 // Region phải khớp với region khai báo trong functions/index.js.
 const fns = typeof firebase.functions === "function" ? firebase.app().functions("asia-southeast1") : null;
+
+// Cloud Storage (ảnh Nhật ký lớp học / ảnh đại diện học sinh) — chỉ dùng ở trang có nạp thêm
+// thẻ <script> firebase-storage-compat.js (admin.html).
+const storage = typeof firebase.storage === "function" ? firebase.storage() : null;

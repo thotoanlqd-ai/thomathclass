@@ -139,6 +139,8 @@ function loadDashboard(user) {
       document.getElementById("dash-class").textContent = className;
       document.getElementById("dash-avatar").textContent = (d.fullName || "?").charAt(0).toUpperCase();
 
+      loadClassJournal(d.classId);
+
       // điểm số
       const scoreBody = document.getElementById("score-body");
       const scoreEmpty = document.getElementById("score-empty");
@@ -182,6 +184,47 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ---------- Nhật ký lớp học (chỉ xem, mới nhất lên đầu) ----------
+function loadClassJournal(classId) {
+  const listEl = document.getElementById("journal-list");
+  const emptyEl = document.getElementById("journal-empty");
+  listEl.innerHTML = "";
+  emptyEl.hidden = true;
+
+  db.collection("classJournal")
+    .where("classId", "==", classId)
+    .get()
+    .then((snap) => {
+      const entries = [];
+      snap.forEach((doc) => entries.push(Object.assign({ id: doc.id }, doc.data())));
+      entries.sort((a, b) => {
+        const ta = a.createdAt ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt ? b.createdAt.toMillis() : 0;
+        return tb - ta;
+      });
+
+      if (!entries.length) {
+        emptyEl.hidden = false;
+        return;
+      }
+      entries.forEach((entry) => {
+        const dateStr = entry.createdAt ? new Date(entry.createdAt.toMillis()).toLocaleDateString("vi-VN") : "";
+        const imagesHtml = (entry.images || [])
+          .map((url) => `<img src="${escapeHtml(url)}" class="journal-thumb" />`)
+          .join("");
+        const card = document.createElement("div");
+        card.className = "journal-post";
+        card.innerHTML = `
+          <span class="date">${escapeHtml(dateStr)}</span>
+          <p>${escapeHtml(entry.content || "")}</p>
+          <div class="journal-images">${imagesHtml}</div>
+        `;
+        listEl.appendChild(card);
+      });
+    })
+    .catch((err) => console.error("loadClassJournal lỗi:", err));
 }
 
 document.getElementById("btn-logout").addEventListener("click", () => {

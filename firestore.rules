@@ -81,5 +81,23 @@ service cloud.firestore {
                      (request.auth.uid == resource.data.studentId || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
       allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
     }
+
+    // classJournal: bài viết "Nhật ký lớp học" (chữ + ảnh), áp dụng cho MỌI lớp trong CLASS_LIST
+    // (kể cả lớp lập thêm sau này — không có danh sách lớp cố định ở đây).
+    // Đọc được nếu là admin, hoặc học sinh có roster đúng classId của bài viết đó.
+    // Chỉ admin được tạo/sửa/xoá.
+    match /classJournal/{entryId} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72" ||
+                      (exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == resource.data.classId));
+      allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+    }
+
+    // studentAvatars: ảnh đại diện học sinh — tách riêng khỏi students/roster để học sinh
+    // (kể cả chính chủ) KHÔNG đọc được, chỉ admin xem/tải lên.
+    match /studentAvatars/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+    }
   }
 }

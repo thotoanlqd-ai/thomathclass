@@ -864,6 +864,42 @@ section { padding: 64px 0; }
 }
 .mini-btn:hover { text-decoration: underline; }
 
+/* nhật ký lớp học */
+.journal-post {
+  border-left: 3px solid var(--highlight);
+  background: var(--paper);
+  padding: 14px 16px;
+  border-radius: 0 10px 10px 0;
+  margin-bottom: 14px;
+}
+.journal-post .date { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--muted); display: block; margin-bottom: 4px; }
+.journal-post p { margin: 0 0 8px; white-space: pre-wrap; }
+.journal-images { display: flex; flex-wrap: wrap; gap: 8px; }
+.journal-thumb { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--card-border); }
+.journal-thumb-wrap { position: relative; }
+.journal-thumb-remove {
+  position: absolute; top: -6px; right: -6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--pen-red); color: #fff; border: none;
+  font-size: 0.85rem; line-height: 1; cursor: pointer;
+}
+
+/* ảnh đại diện học sinh (admin) */
+.avatar-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--card-border); flex-wrap: wrap; }
+.avatar-thumb { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid var(--card-border); flex-shrink: 0; }
+.avatar-thumb-empty {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: var(--chalk); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 0.9rem;
+}
+.avatar-row .link-btn {
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  font-size: 0.92rem; font-weight: 600; color: var(--ink); padding: 0; flex: 1; text-align: left;
+}
+.avatar-row .link-btn:hover { color: var(--pen-red); }
+.avatar-upload-btn { cursor: pointer; white-space: nowrap; }
+
 .admin-locked {
   text-align: center;
   padding: 60px 20px;
