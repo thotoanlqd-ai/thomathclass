@@ -213,6 +213,7 @@ function loadStudentPicker(classId) {
 
 document.getElementById("pick-student").addEventListener("change", (e) => {
   const uid = e.target.value;
+  filterStudentAvatarList(uid);
   if (!uid) {
     document.getElementById("student-editor").hidden = true;
     return;
@@ -426,6 +427,8 @@ function renderStudentAvatarList(students) {
   students.forEach((s) => {
     const row = document.createElement("div");
     row.className = "avatar-row";
+    row.dataset.uid = s.uid;
+    row.hidden = true;
     row.innerHTML = `
       <img class="avatar-thumb" id="avatar-thumb-${s.uid}" alt="" hidden />
       <span class="avatar-thumb-empty" id="avatar-thumb-empty-${s.uid}">${escapeHtml((s.fullName || "?").charAt(0).toUpperCase())}</span>
@@ -457,6 +460,13 @@ function renderStudentAvatarList(students) {
         }
       })
       .catch((err) => console.error("Không tải được ảnh đại diện:", err));
+  });
+}
+
+function filterStudentAvatarList(selectedUid) {
+  const wrap = document.getElementById("student-avatar-list");
+  wrap.querySelectorAll(".avatar-row").forEach((row) => {
+    row.hidden = row.dataset.uid !== selectedUid;
   });
 }
 
