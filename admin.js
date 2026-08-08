@@ -1249,7 +1249,7 @@ function loadContentList() {
 
   db.collection("products")
     .where("category", "==", currentContentCategory)
-    .orderBy("order")
+    .orderBy("order", "desc")
     .get()
     .then((snap) => {
       if (snap.empty) {

@@ -47,7 +47,7 @@ function loadProducts() {
   const productsPromise = db
     .collection("products")
     .where("category", "==", PRODUCT_CATEGORY)
-    .orderBy("order")
+    .orderBy("order", "desc")
     .get();
 
   // Đợi Firebase Auth khôi phục phiên đăng nhập (nếu có) trước khi đọc danh sách đã mua,
