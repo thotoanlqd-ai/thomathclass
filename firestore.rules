@@ -94,10 +94,11 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
     }
 
-    // studentAvatars: ảnh đại diện học sinh — tách riêng khỏi students/roster để học sinh
-    // (kể cả chính chủ) KHÔNG đọc được, chỉ admin xem/tải lên.
+    // studentAvatars: ảnh đại diện học sinh — tách riêng khỏi students/roster.
+    // Chính học sinh đó tự xem/đổi ảnh của mình sau khi đăng nhập; giáo viên xem/đổi được mọi ảnh.
     match /studentAvatars/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+      allow read, write: if request.auth != null &&
+                             (request.auth.uid == uid || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
     }
   }
 }

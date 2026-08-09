@@ -803,15 +803,22 @@ section { padding: 64px 0; }
   margin-bottom: 24px;
 }
 .dash-header .who { display: flex; align-items: center; gap: 14px; }
-.dash-header .avatar-sm {
+.dash-header .avatar-sm-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+.dash-header .avatar-sm,
+.dash-header .avatar-sm-img {
   width: 52px; height: 52px; border-radius: 50%;
+  border: 3px solid var(--highlight);
+}
+.dash-header .avatar-sm {
   background: var(--chalk); color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 1.3rem;
-  border: 3px solid var(--highlight);
 }
+.dash-header .avatar-sm-img { object-fit: cover; }
+.dash-header .avatar-sm-img[hidden] { display: none; }
 .dash-header h2 { margin: 0; font-size: 1.2rem; }
-.dash-header .cls { color: var(--muted); font-size: 0.88rem; }
+.dash-header .cls { color: var(--muted); font-size: 0.88rem; margin: 0 0 4px; }
+.dash-header .dash-avatar-link { font-size: 0.78rem; padding: 3px 10px; }
 
 .score-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
 .score-table th, .score-table td {

@@ -138,6 +138,10 @@ function loadDashboard(user) {
       document.getElementById("dash-name").textContent = d.fullName || "—";
       document.getElementById("dash-class").textContent = className;
       document.getElementById("dash-avatar").textContent = (d.fullName || "?").charAt(0).toUpperCase();
+      document.getElementById("dash-avatar").hidden = false;
+      document.getElementById("dash-avatar-img").hidden = true;
+      document.getElementById("dash-avatar-status").textContent = "";
+      loadDashAvatar(user.uid);
 
       loadClassJournal(d.classId);
 
@@ -178,6 +182,55 @@ function loadDashboard(user) {
       viewRoster.hidden = true;
       viewDashboard.hidden = false;
     });
+}
+
+// ---------- Ảnh đại diện cá nhân (học sinh tự đổi sau khi đăng nhập) ----------
+function loadDashAvatar(uid) {
+  db.collection("studentAvatars")
+    .doc(uid)
+    .get()
+    .then((doc) => {
+      if (doc.exists && doc.data().avatarUrl) {
+        showDashAvatar(doc.data().avatarUrl);
+      }
+    })
+    .catch((err) => console.error("Không tải được ảnh đại diện:", err));
+}
+
+function showDashAvatar(url) {
+  const img = document.getElementById("dash-avatar-img");
+  const letter = document.getElementById("dash-avatar");
+  img.src = url;
+  img.hidden = false;
+  letter.hidden = true;
+}
+
+document.getElementById("dash-avatar-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (file) uploadDashAvatar(file);
+});
+
+async function uploadDashAvatar(file) {
+  const statusEl = document.getElementById("dash-avatar-status");
+  const user = auth.currentUser;
+  if (!user) return;
+  statusEl.textContent = "Đang tải lên...";
+  try {
+    const blob = await compressImageFile(file, 480, 0.8);
+    const ref = storage.ref().child("studentAvatars/" + user.uid + "/avatar.jpg");
+    await ref.put(blob);
+    const url = await ref.getDownloadURL();
+    await db.collection("studentAvatars").doc(user.uid).set({
+      avatarUrl: url,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    showDashAvatar(url);
+    statusEl.textContent = "✓ Đã cập nhật.";
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi: " + err.message;
+  }
 }
 
 function escapeHtml(str) {
