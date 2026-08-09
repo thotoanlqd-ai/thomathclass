@@ -186,6 +186,13 @@
                 <tbody id="comment-data-body"></tbody>
               </table>
 
+              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí cố định hàng tháng (áp dụng mãi mãi cho học sinh này, đến khi xoá)</h4>
+              <div class="admin-row">
+                <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = dùng mặc định 800.000đ)</label><input type="number" id="tuition-fixed" min="0" step="10000" placeholder="Vd: 600000" /></div>
+                <button class="btn btn-outline btn-small" id="btn-save-tuition-fixed">Lưu</button>
+              </div>
+              <p class="field-error" id="tuition-fixed-status"></p>
+
               <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí riêng (chỉ áp dụng cho lần tính học phí tiếp theo, dùng xong tự xoá)</h4>
               <div class="admin-row">
                 <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ)</label><input type="number" id="tuition-override" min="0" step="10000" placeholder="Vd: 500000" /></div>

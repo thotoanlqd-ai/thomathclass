@@ -235,6 +235,11 @@ function loadStudentEditor(uid) {
           ? ""
           : currentStudentData.nextMonthTuitionOverride;
       document.getElementById("tuition-override-status").textContent = "";
+      document.getElementById("tuition-fixed").value =
+        currentStudentData.fixedTuitionAmount === undefined || currentStudentData.fixedTuitionAmount === null
+          ? ""
+          : currentStudentData.fixedTuitionAmount;
+      document.getElementById("tuition-fixed-status").textContent = "";
       document.getElementById("student-editor").hidden = false;
     });
 }
@@ -252,6 +257,30 @@ document.getElementById("btn-save-tuition-override").addEventListener("click", (
     raw === ""
       ? { nextMonthTuitionOverride: firebase.firestore.FieldValue.delete() }
       : { nextMonthTuitionOverride: Number(raw) };
+  db.collection("students")
+    .doc(currentStudentUid)
+    .set(update, { merge: true })
+    .then(() => {
+      statusEl.textContent = "✓ Đã lưu.";
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
+
+document.getElementById("btn-save-tuition-fixed").addEventListener("click", () => {
+  const statusEl = document.getElementById("tuition-fixed-status");
+  if (!currentStudentUid) return;
+  const raw = document.getElementById("tuition-fixed").value.trim();
+  if (raw !== "" && (isNaN(Number(raw)) || Number(raw) < 0)) {
+    statusEl.textContent = "Số tiền phải là số không âm, hoặc để trống để dùng mặc định.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  const update =
+    raw === ""
+      ? { fixedTuitionAmount: firebase.firestore.FieldValue.delete() }
+      : { fixedTuitionAmount: Number(raw) };
   db.collection("students")
     .doc(currentStudentUid)
     .set(update, { merge: true })

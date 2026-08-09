@@ -94,8 +94,15 @@ exports.generateMonthlyTuition = onSchedule(
 
       const studentRef = db.collection("students").doc(studentId);
       const studentSnap = await studentRef.get();
-      const override = studentSnap.exists ? studentSnap.data().nextMonthTuitionOverride : null;
-      const amount = typeof override === "number" && override > 0 ? override : DEFAULT_TUITION_AMOUNT;
+      const studentData = studentSnap.exists ? studentSnap.data() : {};
+      const override = studentData.nextMonthTuitionOverride;
+      const fixedAmount = studentData.fixedTuitionAmount;
+      const amount =
+        typeof override === "number" && override > 0
+          ? override
+          : typeof fixedAmount === "number" && fixedAmount > 0
+          ? fixedAmount
+          : DEFAULT_TUITION_AMOUNT;
 
       await tuitionRef.set({
         classId,
