@@ -32,7 +32,7 @@ const LOGIN_EMAIL_DOMAIN = "hocsinh.thomathclass.app";
 const CLASS_LIST = [
   { id: "12a6-lqd", name: "12A6 LQĐ" },
   { id: "12a7-lqd", name: "12A7 LQĐ" },
-  { id: "10c-lqd", name: "10C LQĐ" },
+  { id: "10c-lqd", name: "10C5 LQĐ" },
   { id: "tho-2k9", name: "Thầy Thọ vs 2k9" },
   { id: "tho-2k10", name: "Thầy Thọ vs 2k10" },
   { id: "tho-2k11", name: "Thầy Thọ vs 2k11" }
