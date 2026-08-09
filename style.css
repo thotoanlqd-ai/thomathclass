@@ -816,6 +816,7 @@ section { padding: 64px 0; }
 }
 .dash-header .avatar-sm-img { object-fit: cover; }
 .dash-header .avatar-sm-img[hidden] { display: none; }
+.dash-header .avatar-sm[hidden] { display: none; }
 .dash-header h2 { margin: 0; font-size: 1.2rem; }
 .dash-header .cls { color: var(--muted); font-size: 0.88rem; margin: 0 0 4px; }
 .dash-header .dash-avatar-link { font-size: 0.78rem; padding: 3px 10px; }
