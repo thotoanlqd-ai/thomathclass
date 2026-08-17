@@ -307,10 +307,12 @@
             <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:var(--muted);margin-bottom:8px;">
               <input type="checkbox" id="delete-select-all" /> Chọn tất cả
             </label>
-            <table class="data-table" id="delete-list-table">
-              <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th><th>Chức vụ</th><th></th></tr></thead>
-              <tbody id="delete-list-body"></tbody>
-            </table>
+            <div style="overflow-x:auto;">
+              <table class="data-table" id="delete-list-table">
+                <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th><th>Chức vụ</th><th></th></tr></thead>
+                <tbody id="delete-list-body"></tbody>
+              </table>
+            </div>
             <p class="empty-note" id="delete-list-empty" hidden>Lớp này chưa có học sinh nào.</p>
           </div>
 
