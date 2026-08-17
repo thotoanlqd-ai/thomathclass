@@ -96,6 +96,27 @@
 
         <div class="dash-section">
           <h3>Nhật ký lớp học</h3>
+
+          <div id="journal-write-panel" hidden style="margin-bottom:18px;padding:14px;border:1px dashed var(--card-border);border-radius:8px;">
+            <div id="journal-write-edit-banner" hidden style="background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;font-size:0.86rem;margin-bottom:14px;align-items:center;justify-content:space-between;gap:10px;">
+              <span>Đang sửa 1 bài viết của em.</span>
+              <button type="button" class="back-link" id="btn-journal-write-cancel-edit">Huỷ sửa</button>
+            </div>
+            <div class="field">
+              <label>Nội dung</label>
+              <textarea id="journal-write-content" rows="3" placeholder="Hôm nay lớp học..."></textarea>
+            </div>
+            <div id="journal-write-kept-images" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+            <div class="admin-row">
+              <div class="field">
+                <label>Thêm ảnh (có thể chọn nhiều)</label>
+                <input type="file" id="journal-write-images" accept="image/*" multiple />
+              </div>
+              <button type="button" class="btn btn-primary btn-small" id="btn-journal-write-post">Đăng bài</button>
+            </div>
+            <p class="field-error" id="journal-write-status"></p>
+          </div>
+
           <div id="journal-list"></div>
           <p class="empty-note" id="journal-empty" hidden>Chưa có bài nhật ký nào.</p>
         </div>

@@ -19,6 +19,11 @@ let pendingCode = null;
 let pendingName = null;
 let currentClassId = null;
 
+// Thông tin tài khoản học sinh đang đăng nhập (dùng cho khung viết Nhật ký lớp học)
+let myClassId = null;
+let myClassRole = null;
+let myFullName = null;
+
 // ---------- Render 6 lớp học ----------
 function renderClassGrid() {
   classGrid.innerHTML = "";
@@ -122,16 +127,22 @@ function doLogin() {
 
 // ---------- Dashboard cá nhân ----------
 function loadDashboard(user) {
-  db.collection("students")
-    .doc(user.uid)
-    .get()
-    .then((doc) => {
+  Promise.all([
+    db.collection("students").doc(user.uid).get(),
+    db.collection("roster").doc(user.uid).get(),
+  ])
+    .then(([doc, rosterDoc]) => {
       if (!doc.exists) {
         loginError.textContent = "Không tìm thấy dữ liệu học sinh cho tài khoản này.";
         auth.signOut();
         return;
       }
       const d = doc.data();
+      const rosterData = rosterDoc.exists ? rosterDoc.data() : {};
+      myClassId = d.classId;
+      myClassRole = rosterData.classRole || null;
+      myFullName = d.fullName;
+
       const className =
         (CLASS_LIST.find((c) => c.id === d.classId) || {}).name || d.classId;
 
@@ -143,6 +154,7 @@ function loadDashboard(user) {
       document.getElementById("dash-avatar-status").textContent = "";
       loadDashAvatar(user.uid);
 
+      setupJournalWritePanel();
       loadClassJournal(d.classId);
 
       // điểm số
@@ -239,12 +251,14 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---------- Nhật ký lớp học (chỉ xem, mới nhất lên đầu) ----------
+// ---------- Nhật ký lớp học (xem, và viết/sửa/xoá nếu có chức vụ lớp) ----------
 function loadClassJournal(classId) {
   const listEl = document.getElementById("journal-list");
   const emptyEl = document.getElementById("journal-empty");
   listEl.innerHTML = "";
   emptyEl.hidden = true;
+
+  const user = auth.currentUser;
 
   db.collection("classJournal")
     .where("classId", "==", classId)
@@ -267,17 +281,188 @@ function loadClassJournal(classId) {
         const imagesHtml = (entry.images || [])
           .map((url) => `<img src="${escapeHtml(url)}" class="journal-thumb" />`)
           .join("");
+        const authorLineHtml = entry.authorName
+          ? `<p class="date" style="margin-top:6px;">Đăng bởi: ${escapeHtml(entry.authorName)}${
+              entry.authorRole ? " - " + escapeHtml(entry.authorRole) : ""
+            }</p>`
+          : "";
         const card = document.createElement("div");
         card.className = "journal-post";
         card.innerHTML = `
           <span class="date">${escapeHtml(dateStr)}</span>
           <p>${escapeHtml(entry.content || "")}</p>
           <div class="journal-images">${imagesHtml}</div>
+          ${authorLineHtml}
         `;
+        if (user && entry.authorUid && entry.authorUid === user.uid) {
+          const actions = document.createElement("div");
+          actions.style.marginTop = "8px";
+          actions.style.display = "flex";
+          actions.style.gap = "14px";
+          actions.innerHTML = `
+            <button type="button" class="mini-btn" data-action="edit">Sửa</button>
+            <button type="button" class="mini-btn" data-action="delete" style="color:var(--muted);">Xoá</button>
+          `;
+          actions.querySelector('[data-action="edit"]').addEventListener("click", () => startEditMyJournalEntry(entry));
+          actions.querySelector('[data-action="delete"]').addEventListener("click", () => deleteMyJournalEntry(entry));
+          card.appendChild(actions);
+        }
         listEl.appendChild(card);
       });
     })
     .catch((err) => console.error("loadClassJournal lỗi:", err));
+}
+
+// ---------- Khung viết bài Nhật ký lớp học cho học sinh có chức vụ ----------
+let journalWriteEditingId = null;
+let journalWriteOriginalImages = [];
+let journalWriteKeptImages = [];
+
+function setupJournalWritePanel() {
+  const panel = document.getElementById("journal-write-panel");
+  const canWrite = !!(myClassRole && CLASS_ROLE_LABELS[myClassRole]);
+  panel.hidden = !canWrite;
+  if (!canWrite) cancelEditJournalWrite();
+}
+
+function renderJournalWriteKeptImages() {
+  const wrap = document.getElementById("journal-write-kept-images");
+  wrap.innerHTML = "";
+  journalWriteKeptImages.forEach((url, idx) => {
+    const box = document.createElement("div");
+    box.className = "journal-thumb-wrap";
+    box.innerHTML = `<img src="${escapeHtml(url)}" class="journal-thumb" /><button type="button" class="journal-thumb-remove" title="Bỏ ảnh này">×</button>`;
+    box.querySelector("button").addEventListener("click", () => {
+      journalWriteKeptImages.splice(idx, 1);
+      renderJournalWriteKeptImages();
+    });
+    wrap.appendChild(box);
+  });
+}
+
+function startEditMyJournalEntry(entry) {
+  journalWriteEditingId = entry.id;
+  journalWriteOriginalImages = (entry.images || []).slice();
+  journalWriteKeptImages = (entry.images || []).slice();
+  document.getElementById("journal-write-content").value = entry.content || "";
+  document.getElementById("btn-journal-write-post").textContent = "Lưu chỉnh sửa";
+  const bannerEl = document.getElementById("journal-write-edit-banner");
+  bannerEl.hidden = false;
+  bannerEl.style.display = "flex";
+  renderJournalWriteKeptImages();
+  document.getElementById("journal-write-panel").scrollIntoView({ behavior: "smooth" });
+}
+
+function cancelEditJournalWrite() {
+  journalWriteEditingId = null;
+  journalWriteOriginalImages = [];
+  journalWriteKeptImages = [];
+  const contentEl = document.getElementById("journal-write-content");
+  const imagesEl = document.getElementById("journal-write-images");
+  if (contentEl) contentEl.value = "";
+  if (imagesEl) imagesEl.value = "";
+  const btn = document.getElementById("btn-journal-write-post");
+  if (btn) btn.textContent = "Đăng bài";
+  const bannerEl = document.getElementById("journal-write-edit-banner");
+  if (bannerEl) {
+    bannerEl.hidden = true;
+    bannerEl.style.display = "";
+  }
+  const keptEl = document.getElementById("journal-write-kept-images");
+  if (keptEl) keptEl.innerHTML = "";
+  const statusEl = document.getElementById("journal-write-status");
+  if (statusEl) statusEl.textContent = "";
+}
+
+document.getElementById("btn-journal-write-cancel-edit").addEventListener("click", cancelEditJournalWrite);
+
+document.getElementById("btn-journal-write-post").addEventListener("click", async () => {
+  const user = auth.currentUser;
+  if (!user || !myClassId || !myClassRole) return;
+  const content = document.getElementById("journal-write-content").value.trim();
+  const filesInput = document.getElementById("journal-write-images");
+  const files = Array.from(filesInput.files || []);
+  const statusEl = document.getElementById("journal-write-status");
+  const btn = document.getElementById("btn-journal-write-post");
+
+  if (!content && !files.length && journalWriteKeptImages.length === 0) {
+    statusEl.textContent = "Nhập nội dung hoặc chọn ít nhất 1 ảnh.";
+    return;
+  }
+
+  statusEl.textContent = "Đang đăng...";
+  btn.disabled = true;
+  try {
+    const entryRef = journalWriteEditingId
+      ? db.collection("classJournal").doc(journalWriteEditingId)
+      : db.collection("classJournal").doc();
+
+    const uploadedUrls = [];
+    for (const file of files) {
+      const blob = await compressImageFile(file, 1200, 0.75);
+      const path =
+        "classJournal/" + myClassId + "/" + entryRef.id + "/" + Date.now() + "-" + Math.random().toString(36).slice(2) + ".jpg";
+      const ref = storage.ref().child(path);
+      await ref.put(blob);
+      const url = await ref.getDownloadURL();
+      uploadedUrls.push(url);
+    }
+
+    if (journalWriteEditingId) {
+      const finalImages = journalWriteKeptImages.concat(uploadedUrls);
+      const removed = journalWriteOriginalImages.filter((u) => journalWriteKeptImages.indexOf(u) === -1);
+      await Promise.all(
+        removed.map((url) =>
+          storage
+            .refFromURL(url)
+            .delete()
+            .catch((err) => console.error("Không xoá được ảnh cũ trên Storage:", err))
+        )
+      );
+      await entryRef.update({
+        content,
+        images: finalImages,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await entryRef.set({
+        classId: myClassId,
+        content,
+        images: uploadedUrls,
+        authorUid: user.uid,
+        authorName: myFullName,
+        authorRole: CLASS_ROLE_LABELS[myClassRole] || null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    cancelEditJournalWrite();
+    loadClassJournal(myClassId);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi: " + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function deleteMyJournalEntry(entry) {
+  if (!confirm("Xoá bài nhật ký này? Không thể hoàn tác.")) return;
+  Promise.all(
+    (entry.images || []).map((url) =>
+      storage
+        .refFromURL(url)
+        .delete()
+        .catch((err) => console.error("Không xoá được ảnh trên Storage:", err))
+    )
+  )
+    .then(() => db.collection("classJournal").doc(entry.id).delete())
+    .then(() => {
+      if (journalWriteEditingId === entry.id) cancelEditJournalWrite();
+      loadClassJournal(entry.classId);
+    })
+    .catch((err) => alert("Lỗi khi xoá: " + err.message));
 }
 
 document.getElementById("btn-logout").addEventListener("click", () => {

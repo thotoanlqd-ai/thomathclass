@@ -38,6 +38,18 @@ const CLASS_LIST = [
   { id: "tho-2k11", name: "Thầy Thọ vs 2k11" }
 ];
 
+// Chức vụ lớp cho phép học sinh viết bài "Nhật ký lớp học" (ngoài admin).
+// Áp dụng chung cho mọi lớp trong CLASS_LIST — lớp nào có gán chức vụ (roster.classRole)
+// thì học sinh đó viết được, lớp không gán ai thì chỉ admin viết như trước.
+// Key phải khớp CHÍNH XÁC với các giá trị cho phép trong firestore.rules/storage.rules.
+const CLASS_ROLE_LABELS = {
+  "lop-truong": "Lớp trưởng",
+  "lop-pho-hoc-tap": "Lớp phó học tập",
+  "lop-pho-ne-nep": "Lớp phó nề nếp",
+  "bi-thu": "Bí thư",
+  "thu-quy": "Thủ quỹ",
+};
+
 // --- Khởi tạo Firebase (dùng SDK compat, tải qua thẻ <script> ở mỗi trang) ---
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();

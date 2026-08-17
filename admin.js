@@ -687,6 +687,9 @@ document.getElementById("btn-journal-post").addEventListener("click", async () =
         classId,
         content,
         images: uploadedUrls,
+        authorUid: null,
+        authorName: "Giáo viên",
+        authorRole: null,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
@@ -1013,16 +1016,27 @@ function loadDeleteList() {
         const d = doc.data();
         deleteRosterCache.push({ uid: doc.id, fullName: d.fullName, code: d.code });
         const tr = document.createElement("tr");
+        const roleOptionsHtml =
+          '<option value="">Không có</option>' +
+          Object.keys(CLASS_ROLE_LABELS)
+            .map((key) => `<option value="${key}">${escapeHtml(CLASS_ROLE_LABELS[key])}</option>`)
+            .join("");
         tr.innerHTML = `
           <td><input type="checkbox" class="delete-row-check" data-uid="${doc.id}" /></td>
           <td>${escapeHtml(d.fullName || "")}</td>
           <td class="mono">${escapeHtml(d.code || "")}</td>
+          <td>
+            <select class="class-role-select" data-uid="${doc.id}">${roleOptionsHtml}</select>
+            <span class="field-error" id="class-role-status-${doc.id}"></span>
+          </td>
           <td style="white-space:nowrap;">
             <button class="mini-btn" data-action="reset" data-uid="${doc.id}">Reset mật khẩu</button>
             &nbsp;
             <button class="mini-btn" data-action="delete-one" data-uid="${doc.id}" style="color:var(--muted);">Xoá</button>
           </td>
         `;
+        tr.querySelector(".class-role-select").value = d.classRole || "";
+        tr.querySelector(".class-role-select").addEventListener("change", (e) => saveClassRole(doc.id, e.target.value));
         tr.querySelector('[data-action="reset"]').addEventListener("click", () => resetStudentPassword(doc.id));
         tr.querySelector('[data-action="delete-one"]').addEventListener("click", () => {
           const s = deleteRosterCache.find((x) => x.uid === doc.id);
@@ -1044,6 +1058,22 @@ function loadDeleteList() {
       console.error(err);
       emptyNote.hidden = false;
       emptyNote.textContent = "Không tải được danh sách: " + err.message;
+    });
+}
+
+// ---------- Gán/đổi chức vụ lớp (cho phép viết Nhật ký lớp học) ----------
+function saveClassRole(uid, classRole) {
+  const statusEl = document.getElementById("class-role-status-" + uid);
+  if (statusEl) statusEl.textContent = "Đang lưu...";
+  const update = classRole ? { classRole } : { classRole: firebase.firestore.FieldValue.delete() };
+  db.collection("roster")
+    .doc(uid)
+    .set(update, { merge: true })
+    .then(() => {
+      if (statusEl) statusEl.textContent = "✓ Đã lưu.";
+    })
+    .catch((err) => {
+      if (statusEl) statusEl.textContent = "Lỗi: " + err.message;
     });
 }
 

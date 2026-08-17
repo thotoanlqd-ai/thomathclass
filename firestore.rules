@@ -11,6 +11,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // 5 chức vụ lớp được phép viết bài "Nhật ký lớp học" (ngoài admin) — PHẢI khớp
+    // CLASS_ROLE_LABELS trong firebase-config.js và ALLOWED_ROLES trong storage.rules.
+    function journalRoles() {
+      return ["lop-truong", "lop-pho-hoc-tap", "lop-pho-ne-nep", "bi-thu", "thu-quy"];
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+    }
+
+    // Học sinh có quyền viết nhật ký: có roster, chức vụ thuộc journalRoles(),
+    // và đúng classId của roster khớp classId truyền vào.
+    function canWriteJournalFor(classId) {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classRole in journalRoles() &&
+             get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId;
+    }
+
     // roster: danh sách công khai (chỉ tên + lớp), ai cũng xem được
     // nhưng CHỈ giáo viên mới được thêm/sửa/xoá
     match /roster/{studentId} {
@@ -85,13 +104,18 @@ service cloud.firestore {
     // classJournal: bài viết "Nhật ký lớp học" (chữ + ảnh), áp dụng cho MỌI lớp trong CLASS_LIST
     // (kể cả lớp lập thêm sau này — không có danh sách lớp cố định ở đây).
     // Đọc được nếu là admin, hoặc học sinh có roster đúng classId của bài viết đó.
-    // Chỉ admin được tạo/sửa/xoá.
+    // Tạo bài: admin, hoặc học sinh có chức vụ lớp (journalRoles()) đúng lớp mình —
+    // và phải tự ghi đúng authorUid của mình (không giả mạo người khác).
+    // Sửa/xoá: admin sửa/xoá được mọi bài; học sinh chỉ sửa/xoá được đúng bài do mình viết.
     match /classJournal/{entryId} {
       allow read: if request.auth != null &&
-                     (request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72" ||
+                     (isAdmin() ||
                       (exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
                        get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == resource.data.classId));
-      allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
+      allow create: if isAdmin() ||
+                       (canWriteJournalFor(request.resource.data.classId) &&
+                        request.resource.data.authorUid == request.auth.uid);
+      allow update, delete: if isAdmin() || request.auth.uid == resource.data.authorUid;
     }
 
     // studentAvatars: ảnh đại diện học sinh — tách riêng khỏi students/roster.
