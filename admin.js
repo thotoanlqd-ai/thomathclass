@@ -117,6 +117,41 @@ function initAdminPanel() {
   initContentManager();
   loadMembersList();
   initTuitionPanel();
+  initAdminSidebar();
+  initPhanAnhPanel();
+}
+
+// ==========================================================
+// ĐIỀU HƯỚNG SIDEBAR (bố cục 2 cột: sidebar trái + nội dung phải)
+// ==========================================================
+function initAdminSidebar() {
+  const sidebar = document.getElementById("admin-sidebar");
+  const overlay = document.getElementById("admin-sidebar-overlay");
+  const toggleBtn = document.getElementById("admin-sidebar-toggle");
+  if (!sidebar || sidebar.dataset.wired) return; // tránh gắn lại nếu initAdminPanel chạy nhiều lần
+  sidebar.dataset.wired = "1";
+
+  function closeMobileSidebar() {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("open");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("open");
+  });
+  overlay.addEventListener("click", closeMobileSidebar);
+
+  document.querySelectorAll(".admin-sidebar-link").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.section;
+      document.querySelectorAll(".admin-sidebar-link").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".admin-content .admin-section").forEach((sec) => {
+        sec.hidden = sec.dataset.section !== key;
+      });
+      closeMobileSidebar();
+    });
+  });
 }
 
 function populateClassSelects() {
@@ -1718,3 +1753,105 @@ document.getElementById("btn-tuition-manual-confirm").addEventListener("click", 
       errorEl.textContent = "Lỗi: " + err.message;
     });
 });
+
+// ==========================================================
+// Ý KIẾN PHẢN HỒI — collection phan_anh (form "Phản ánh - Yêu cầu"
+// trong khu vực lớp học / khu vực khóa học trên website)
+// ==========================================================
+let phanAnhAll = [];
+let phanAnhFilter = "moi";
+let phanAnhUnsub = null;
+
+function initPhanAnhPanel() {
+  if (phanAnhUnsub) return; // đã có listener realtime chạy rồi, không gắn lại
+
+  phanAnhUnsub = db
+    .collection("phan_anh")
+    .orderBy("thoiGianGui", "desc")
+    .onSnapshot(
+      (snap) => {
+        phanAnhAll = [];
+        snap.forEach((doc) => phanAnhAll.push(Object.assign({ id: doc.id }, doc.data())));
+        updatePhanAnhBadge();
+        renderPhanAnhList();
+      },
+      (err) => {
+        console.error("Không tải được ý kiến phản hồi:", err);
+      }
+    );
+
+  document.querySelectorAll("#phan-anh-filter .filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#phan-anh-filter .filter-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      phanAnhFilter = btn.dataset.filter;
+      renderPhanAnhList();
+    });
+  });
+}
+
+// Đếm số phản hồi có trạng thái "Mới" và hiện badge cạnh mục sidebar + nút hamburger mobile
+function updatePhanAnhBadge() {
+  const count = phanAnhAll.filter((p) => p.trangThai === "Mới").length;
+  [document.getElementById("phan-anh-badge"), document.getElementById("admin-toggle-badge")].forEach((el) => {
+    if (!el) return;
+    el.textContent = String(count);
+    el.hidden = count === 0;
+  });
+}
+
+function renderPhanAnhList() {
+  const wrap = document.getElementById("phan-anh-list");
+  const emptyNote = document.getElementById("phan-anh-empty");
+  if (!wrap) return;
+
+  const items = phanAnhFilter === "moi" ? phanAnhAll.filter((p) => p.trangThai === "Mới") : phanAnhAll;
+  wrap.innerHTML = "";
+
+  if (!items.length) {
+    emptyNote.hidden = false;
+    return;
+  }
+  emptyNote.hidden = true;
+
+  items.forEach((p) => {
+    const when = p.thoiGianGui && p.thoiGianGui.toDate ? formatDateTimeVN(p.thoiGianGui.toDate()) : "—";
+    const isNew = p.trangThai === "Mới";
+    const card = document.createElement("div");
+    card.className = "panel";
+    card.style.cssText = "margin-bottom:12px;padding:16px 18px;";
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div>
+          <span class="mono" style="font-size:0.75rem;color:var(--muted);">${escapeHtml(when)}</span>
+          <h4 style="margin:4px 0 2px;font-size:0.98rem;">${escapeHtml(p.loai || "Khác")} — ${escapeHtml(p.tenHocSinh || "")}</h4>
+          <p style="margin:0;color:var(--muted);font-size:0.85rem;">Phụ huynh: ${escapeHtml(p.tenPhuHuynh || "")} · Lớp: ${escapeHtml(p.lop || "")} · SĐT: ${escapeHtml(p.soDienThoai || "")}</p>
+        </div>
+        <span style="font-size:0.75rem;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap;${
+          isNew ? "background:#fbeaea;color:var(--pen-red-dark);" : "background:var(--paper);color:var(--muted);"
+        }">${escapeHtml(p.trangThai || "")}</span>
+      </div>
+      <p style="margin:10px 0 0;white-space:pre-wrap;">${escapeHtml(p.noiDung || "")}</p>
+    `;
+    if (isNew) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-outline btn-small";
+      btn.style.marginTop = "12px";
+      btn.textContent = "Đánh dấu đã xem";
+      btn.addEventListener("click", () => markPhanAnhSeen(p.id));
+      card.appendChild(btn);
+    }
+    wrap.appendChild(card);
+  });
+}
+
+function markPhanAnhSeen(id) {
+  db.collection("phan_anh")
+    .doc(id)
+    .update({ trangThai: "Đã xem" })
+    .catch((err) => {
+      console.error("Lỗi khi đánh dấu đã xem:", err);
+      alert("Có lỗi khi cập nhật, thầy thử lại nhé.");
+    });
+}

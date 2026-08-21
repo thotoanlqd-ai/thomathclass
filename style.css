@@ -965,3 +965,120 @@ section { padding: 64px 0; }
 @media (max-width: 860px) {
   .nav-account { padding: 4px 0 0; }
 }
+
+/* ---------- Trang quản trị: bố cục sidebar ---------- */
+.admin-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.admin-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 90px;
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+}
+
+.admin-sidebar-group { margin-bottom: 20px; }
+.admin-sidebar-group:last-child { margin-bottom: 0; }
+.admin-sidebar-group-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px 10px;
+}
+
+.admin-sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: none;
+  border-left: 3px solid transparent;
+  background: none;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--ink);
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+.admin-sidebar-link:hover { background: var(--paper); color: var(--pen-red); }
+.admin-sidebar-link.active {
+  background: var(--paper);
+  border-left-color: var(--pen-red);
+  color: var(--pen-red);
+  font-weight: 700;
+}
+
+.admin-sidebar-badge {
+  background: var(--pen-red);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.admin-content { flex: 1; min-width: 0; }
+.admin-section:not([hidden]) { display: block; }
+
+.admin-sidebar-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.admin-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 30, 0.45);
+  z-index: 190;
+}
+.admin-sidebar-overlay.open { display: block; }
+
+@media (max-width: 860px) {
+  .admin-sidebar-toggle { display: inline-flex; }
+  .admin-layout { display: block; }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    max-height: 100vh;
+    width: 82vw;
+    max-width: 300px;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--shadow);
+    z-index: 200;
+  }
+  .admin-sidebar.open { transform: translateX(0); }
+}

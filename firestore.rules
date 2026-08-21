@@ -127,11 +127,14 @@ service cloud.firestore {
 
     // phan_anh: form "Phản ánh - Yêu cầu" — chỉ hiện trong khu vực lớp học (lophoc.html)
     // và khu vực khóa học đã mua (khoahoc.html) cho tài khoản đã đăng nhập. Rule chỉ chặn
-    // ở mức "đã đăng nhập" (không kiểm tra thành viên lớp/khóa học cụ thể ở đây — việc đó
-    // đã lọc ở UI); KHÔNG đọc/sửa/xoá công khai được, chỉ giáo viên xem trong Firebase Console.
+    // ở mức "đã đăng nhập" khi tạo (không kiểm tra thành viên lớp/khóa học cụ thể ở đây —
+    // việc đó đã lọc ở UI). Chỉ giáo viên (admin) đọc được danh sách và cập nhật trạng thái
+    // (vd "Mới" -> "Đã xem") trong mục "Ý kiến phản hồi" ở trang quản trị — không ai khác
+    // đọc/sửa/xoá được.
     match /phan_anh/{docId} {
       allow create: if request.auth != null;
-      allow read, update, delete: if false;
+      allow read, update: if isAdmin();
+      allow delete: if false;
     }
   }
 }

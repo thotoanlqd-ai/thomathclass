@@ -63,305 +63,374 @@
           <button class="btn btn-outline btn-small" id="btn-admin-logout">Đăng xuất</button>
         </div>
 
-        <!-- Quản lý nội dung: Bài giảng / Tài liệu / Khóa học online / Bài tập Azota -->
-        <div class="panel" style="margin-bottom:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">📚 Quản lý nội dung đăng bán</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Đăng, sửa hoặc xoá các mục hiển thị trên trang Bài giảng, Tài liệu, Khóa học online và Bài tập Azota.</p>
+        <button type="button" class="admin-sidebar-toggle" id="admin-sidebar-toggle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          Danh mục quản trị
+          <span class="admin-sidebar-badge" id="admin-toggle-badge" hidden>0</span>
+        </button>
 
-          <div class="filter-bar" id="content-tabs">
-            <button class="filter-btn active" data-cat="baigiang">Bài giảng</button>
-            <button class="filter-btn" data-cat="tailieu">Tài liệu</button>
-            <button class="filter-btn" data-cat="khoahoc">Khóa học online</button>
-            <button class="filter-btn" data-cat="azota">Bài tập Azota</button>
-          </div>
+        <div class="admin-sidebar-overlay" id="admin-sidebar-overlay"></div>
 
-          <div class="admin-grid">
-            <div>
-              <h4 style="margin:0 0 12px;font-size:0.92rem;" id="content-form-title">Thêm mới — Bài giảng</h4>
-              <div class="field">
-                <label>Tiêu đề</label>
-                <input type="text" id="content-title" placeholder="Vd: Chuyên đề Hàm số — Trọng tâm thi Tốt nghiệp" />
+        <div class="admin-layout">
+          <aside class="admin-sidebar" id="admin-sidebar">
+            <div class="admin-sidebar-group">
+              <p class="admin-sidebar-group-title">Học sinh &amp; lớp học</p>
+              <button type="button" class="admin-sidebar-link active" data-section="them-hoc-sinh">Thêm học sinh</button>
+              <button type="button" class="admin-sidebar-link" data-section="quan-ly-danh-sach">Quản lý danh sách học sinh</button>
+              <button type="button" class="admin-sidebar-link" data-section="nhat-ky-lop">Nhật ký lớp học</button>
+              <button type="button" class="admin-sidebar-link" data-section="xuat-diem">Xuất điểm và nhận xét</button>
+            </div>
+            <div class="admin-sidebar-group">
+              <p class="admin-sidebar-group-title">Thành viên &amp; thanh toán</p>
+              <button type="button" class="admin-sidebar-link" data-section="quan-ly-thanh-vien">Quản lý danh sách thành viên</button>
+              <button type="button" class="admin-sidebar-link" data-section="hoc-phi">Theo dõi học phí</button>
+              <button type="button" class="admin-sidebar-link" data-section="quan-ly-noi-dung">Quản lý nội dung đăng bán</button>
+            </div>
+            <div class="admin-sidebar-group">
+              <p class="admin-sidebar-group-title">Khác</p>
+              <button type="button" class="admin-sidebar-link" data-section="phan-anh">
+                <span>Ý kiến phản hồi</span>
+                <span class="admin-sidebar-badge" id="phan-anh-badge" hidden>0</span>
+              </button>
+            </div>
+          </aside>
+
+          <div class="admin-content">
+
+            <!-- ===== HỌC SINH & LỚP HỌC — Thêm học sinh ===== -->
+            <div class="admin-section" data-section="them-hoc-sinh">
+
+              <!-- Thêm 1 học sinh -->
+              <div class="panel">
+                <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm 1 học sinh (lẻ, không theo danh sách)</h3>
+                <div class="field">
+                  <label>Lớp</label>
+                  <select id="new-class"></select>
+                </div>
+                <div class="field">
+                  <label>Họ tên học sinh</label>
+                  <input type="text" id="new-fullname" placeholder="Vd: Nguyễn Văn A" />
+                </div>
+                <div class="field">
+                  <label>Mã học sinh (dùng để đăng nhập, không dấu, không trùng)</label>
+                  <input type="text" id="new-code" placeholder="Vd: 12a6-nguyenvana" />
+                </div>
+                <div class="field">
+                  <label>Mật khẩu ban đầu</label>
+                  <input type="text" id="new-password" value="123abc" placeholder="Vd: 123abc" />
+                </div>
+                <p class="field-error" id="new-student-error"></p>
+                <button class="btn btn-primary btn-small" id="btn-add-student">Thêm học sinh</button>
               </div>
-              <div class="field">
-                <label>Mô tả ngắn</label>
-                <textarea id="content-desc" rows="2" placeholder="Mô tả ngắn gọn nội dung..."></textarea>
+
+              <!-- Nhập danh sách hàng loạt từ file Word/Excel -->
+              <div class="panel" style="margin-top:22px;">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Thêm học sinh hàng loạt theo lớp</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Bấm chọn 1 lớp, sau đó tải lên file danh sách (.xlsx, .csv hoặc .docx). Mã đăng nhập tự tạo theo quy tắc <span class="mono">tênlớp-hotenkhongdau</span> (vd: <span class="mono">12a6-nguyenvana</span>), mật khẩu mặc định cho tất cả là <strong class="mono">123abc</strong>. Sau khi tạo xong, hệ thống tự tải về 1 file Excel danh sách tài khoản vừa tạo.</p>
+
+                <div class="class-grid" id="bulk-class-grid"></div>
+
+                <div id="bulk-import-panel" hidden style="margin-top:22px;border-top:1px solid var(--card-border);padding-top:22px;">
+                  <div class="panel-head">
+                    <h4 id="bulk-import-class-name" style="margin:0;font-size:1rem;"></h4>
+                    <button class="back-link" id="btn-bulk-back">← Chọn lớp khác</button>
+                  </div>
+
+                  <div class="admin-row" style="margin-top:14px;">
+                    <div class="field">
+                      <label>Chọn file (.xlsx, .csv, .docx)</label>
+                      <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.docx" />
+                    </div>
+                    <button class="btn btn-outline btn-small" id="btn-read-file">Đọc file</button>
+                  </div>
+                  <p class="field-error" id="import-error"></p>
+
+                  <div id="import-preview" hidden>
+                    <h4 style="margin:16px 0 10px;font-size:0.92rem;">Xem lại danh sách trước khi tạo (<span id="import-count">0</span> học sinh)</h4>
+                    <table class="data-table" id="import-preview-table">
+                      <thead><tr><th>Họ tên (bấm để sửa)</th><th>Mã đăng nhập</th><th></th></tr></thead>
+                      <tbody id="import-preview-body"></tbody>
+                    </table>
+                    <button class="btn btn-outline btn-small" id="btn-add-blank-row" style="margin-top:10px;">+ Thêm dòng trống</button>
+                    <div style="margin-top:16px;">
+                      <button class="btn btn-primary btn-small" id="btn-import-confirm">Tạo tài khoản cho toàn bộ danh sách</button>
+                    </div>
+                    <p class="field-error" id="import-progress" style="color:var(--chalk);"></p>
+                  </div>
+                </div>
               </div>
-              <div class="admin-row">
-                <div class="field"><label>Giá hiển thị</label><input type="text" id="content-price" placeholder="Vd: 150.000đ, Miễn phí, Liên hệ" /></div>
-                <div class="field" style="max-width:190px;"><label>Số tiền (VNĐ)</label><input type="number" id="content-amount" min="0" step="1000" placeholder="Vd: 150000" /></div>
-                <div class="field"><label>Nhãn/tag (dùng để lọc)</label><input type="text" id="content-tag" placeholder="Vd: Tốt nghiệp" /></div>
+
+            </div>
+
+            <!-- ===== HỌC SINH & LỚP HỌC — Quản lý danh sách học sinh ===== -->
+            <div class="admin-section" data-section="quan-ly-danh-sach" hidden>
+
+              <!-- Nhập điểm / nhận xét -->
+              <div class="panel">
+                <h3 style="margin:0 0 16px;font-size:1.05rem;">✏️ Nhập điểm &amp; nhận xét</h3>
+                <div class="admin-row">
+                  <div class="field">
+                    <label>Chọn lớp</label>
+                    <select id="pick-class"></select>
+                  </div>
+                  <div class="field">
+                    <label>Chọn học sinh</label>
+                    <select id="pick-student"><option value="">— Chọn lớp trước —</option></select>
+                  </div>
+                </div>
+
+                <div id="student-avatar-list" style="margin-bottom:18px;"></div>
+
+                <div id="student-editor" hidden>
+                  <h4 style="margin:18px 0 10px;font-size:0.92rem;">Thêm điểm số</h4>
+                  <div class="admin-row">
+                    <div class="field"><label>Nội dung</label><input type="text" id="score-label" placeholder="Vd: Kiểm tra 15' — Hàm số" /></div>
+                    <div class="field" style="max-width:110px;"><label>Điểm</label><input type="text" id="score-value" placeholder="8.5" /></div>
+                    <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="score-date" /></div>
+                    <button class="btn btn-primary btn-small" id="btn-add-score">Thêm</button>
+                  </div>
+                  <table class="data-table" id="score-data-table">
+                    <thead><tr><th>Nội dung</th><th>Ngày</th><th>Điểm</th><th></th></tr></thead>
+                    <tbody id="score-data-body"></tbody>
+                  </table>
+
+                  <h4 style="margin:22px 0 10px;font-size:0.92rem;">Thêm nhận xét</h4>
+                  <div class="field">
+                    <textarea id="comment-text" rows="3" placeholder="Nhận xét về học sinh..."></textarea>
+                  </div>
+                  <div class="admin-row">
+                    <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="comment-date" /></div>
+                    <button class="btn btn-primary btn-small" id="btn-add-comment">Thêm nhận xét</button>
+                  </div>
+                  <table class="data-table" id="comment-data-table">
+                    <thead><tr><th>Ngày</th><th>Nội dung</th><th></th></tr></thead>
+                    <tbody id="comment-data-body"></tbody>
+                  </table>
+
+                  <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí cố định hàng tháng (áp dụng mãi mãi cho học sinh này, đến khi xoá)</h4>
+                  <div class="admin-row">
+                    <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = dùng mặc định 800.000đ)</label><input type="number" id="tuition-fixed" min="0" step="10000" placeholder="Vd: 600000" /></div>
+                    <button class="btn btn-outline btn-small" id="btn-save-tuition-fixed">Lưu</button>
+                  </div>
+                  <p class="field-error" id="tuition-fixed-status"></p>
+
+                  <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí riêng (chỉ áp dụng cho lần tính học phí tiếp theo, dùng xong tự xoá)</h4>
+                  <div class="admin-row">
+                    <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ)</label><input type="number" id="tuition-override" min="0" step="10000" placeholder="Vd: 500000" /></div>
+                    <button class="btn btn-outline btn-small" id="btn-save-tuition-override">Lưu</button>
+                  </div>
+                  <p class="field-error" id="tuition-override-status"></p>
+                </div>
               </div>
-              <p style="color:var(--muted);font-size:0.8rem;margin:-6px 0 14px;">
-                Số tiền dùng để tạo QR thanh toán tự động: điền <strong>0</strong> nếu miễn phí, để <strong>trống</strong> nếu giá "Liên hệ" (nút mua sẽ mở Zalo thay vì QR).
-              </p>
-              <div class="admin-row">
-                <div class="field"><label>Link nội dung (học sinh/khách chỉ thấy SAU KHI đã mua)</label><input type="text" id="content-link-url" placeholder="Vd: link Google Drive, link bài tập Azota" /></div>
-                <div class="field"><label>Nhãn nút xem nội dung</label><input type="text" id="content-link-label" placeholder="Vd: Làm bài trên Azota →" /></div>
+
+              <!-- Quản lý danh sách học sinh -->
+              <div class="panel" style="margin-top:22px;">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">🗂️ Quản lý danh sách học sinh</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 6px;">Chọn lớp để xem danh sách. Tick chọn để xoá nhiều em cùng lúc, hoặc dùng nút riêng để xoá/reset mật khẩu từng em.</p>
+                <p style="color:var(--muted);font-size:0.82rem;margin:0 0 16px;background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;">
+                  ⚠️ Lưu ý: thao tác <strong>xoá</strong> làm học sinh mất quyền xem điểm/nhận xét ngay lập tức. Thao tác <strong>reset mật khẩu</strong> sẽ tự tạo lại tài khoản với mật khẩu mặc định <strong class="mono">123abc</strong> và giữ nguyên điểm/nhận xét — nhưng vì giới hạn của hệ thống, <strong>mã đăng nhập của em đó có thể đổi nhẹ</strong> (ví dụ thêm số ở cuối). Hệ thống sẽ hiện mã mới để thầy báo lại cho học sinh.
+                </p>
+
+                <div class="field" style="max-width:320px;">
+                  <label>Chọn lớp</label>
+                  <select id="delete-class"></select>
+                </div>
+
+                <div id="delete-list-wrap" style="margin-top:14px;">
+                  <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:var(--muted);margin-bottom:8px;">
+                    <input type="checkbox" id="delete-select-all" /> Chọn tất cả
+                  </label>
+                  <div style="overflow-x:auto;">
+                    <table class="data-table" id="delete-list-table">
+                      <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th><th>Chức vụ</th><th></th></tr></thead>
+                      <tbody id="delete-list-body"></tbody>
+                    </table>
+                  </div>
+                  <p class="empty-note" id="delete-list-empty" hidden>Lớp này chưa có học sinh nào.</p>
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+                  <button class="btn btn-outline btn-small" id="btn-delete-selected">Xoá học sinh đã chọn</button>
+                  <button class="btn btn-primary btn-small" id="btn-delete-whole-class" style="background:var(--pen-red-dark);">Xoá toàn bộ lớp này</button>
+                </div>
+                <p class="field-error" id="delete-status"></p>
               </div>
-              <div class="admin-row" id="content-zalo-row" hidden>
-                <div class="field"><label>Link nhóm Zalo khóa học (tự hiện cho học sinh sau khi thanh toán thành công)</label><input type="text" id="content-zalo-link" placeholder="Vd: https://zalo.me/g/xxxxxxx" /></div>
-              </div>
-              <p class="field-error" id="content-error"></p>
-              <div style="display:flex;gap:10px;">
-                <button class="btn btn-primary btn-small" id="btn-content-save">Thêm mới</button>
-                <button class="btn btn-outline btn-small" id="btn-content-cancel-edit" hidden>Huỷ sửa</button>
+
+            </div>
+
+            <!-- ===== HỌC SINH & LỚP HỌC — Nhật ký lớp học ===== -->
+            <div class="admin-section" data-section="nhat-ky-lop" hidden>
+              <div class="panel" id="journal-form">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">📓 Nhật ký lớp học</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Đăng cập nhật (chữ + ảnh) cho phụ huynh/học sinh xem trong trang cá nhân của các em. Áp dụng cho mọi lớp, kể cả lớp mới tạo sau này.</p>
+
+                <div class="field" style="max-width:320px;">
+                  <label>Chọn lớp</label>
+                  <select id="journal-class"></select>
+                </div>
+
+                <div id="journal-edit-banner" hidden style="background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;font-size:0.86rem;margin-bottom:14px;align-items:center;justify-content:space-between;gap:10px;">
+                  <span>Đang sửa 1 bài viết đã đăng.</span>
+                  <button class="back-link" id="btn-journal-cancel-edit">Huỷ sửa</button>
+                </div>
+
+                <div class="field">
+                  <label>Nội dung</label>
+                  <textarea id="journal-content" rows="4" placeholder="Hôm nay lớp học..."></textarea>
+                </div>
+
+                <div id="journal-kept-images" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+
+                <div class="admin-row">
+                  <div class="field">
+                    <label>Thêm ảnh (có thể chọn nhiều)</label>
+                    <input type="file" id="journal-images" accept="image/*" multiple />
+                  </div>
+                  <button class="btn btn-primary btn-small" id="btn-journal-post">Đăng bài</button>
+                </div>
+                <p class="field-error" id="journal-status"></p>
+
+                <h4 style="margin:22px 0 10px;font-size:0.92rem;">Các bài đã đăng</h4>
+                <div id="journal-admin-list"></div>
               </div>
             </div>
 
-            <div>
-              <h4 style="margin:0 0 12px;font-size:0.92rem;">Danh sách hiện có</h4>
-              <table class="data-table" id="content-list-table">
-                <thead><tr><th>Tiêu đề</th><th>Giá</th><th>Tag</th><th></th></tr></thead>
-                <tbody id="content-list-body"></tbody>
-              </table>
-              <p class="empty-note" id="content-list-empty" hidden>Chưa có mục nào trong danh mục này.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="admin-grid">
-
-          <!-- Thêm học sinh -->
-          <div class="panel">
-            <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm 1 học sinh (lẻ, không theo danh sách)</h3>
-            <div class="field">
-              <label>Lớp</label>
-              <select id="new-class"></select>
-            </div>
-            <div class="field">
-              <label>Họ tên học sinh</label>
-              <input type="text" id="new-fullname" placeholder="Vd: Nguyễn Văn A" />
-            </div>
-            <div class="field">
-              <label>Mã học sinh (dùng để đăng nhập, không dấu, không trùng)</label>
-              <input type="text" id="new-code" placeholder="Vd: 12a6-nguyenvana" />
-            </div>
-            <div class="field">
-              <label>Mật khẩu ban đầu</label>
-              <input type="text" id="new-password" value="123abc" placeholder="Vd: 123abc" />
-            </div>
-            <p class="field-error" id="new-student-error"></p>
-            <button class="btn btn-primary btn-small" id="btn-add-student">Thêm học sinh</button>
-          </div>
-
-          <!-- Nhập điểm / nhận xét -->
-          <div class="panel">
-            <h3 style="margin:0 0 16px;font-size:1.05rem;">✏️ Nhập điểm &amp; nhận xét</h3>
-            <div class="admin-row">
-              <div class="field">
-                <label>Chọn lớp</label>
-                <select id="pick-class"></select>
-              </div>
-              <div class="field">
-                <label>Chọn học sinh</label>
-                <select id="pick-student"><option value="">— Chọn lớp trước —</option></select>
+            <!-- ===== HỌC SINH & LỚP HỌC — Xuất điểm và nhận xét ===== -->
+            <div class="admin-section" data-section="xuat-diem" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">📊 Xuất điểm &amp; nhận xét ra Excel</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Xuất toàn bộ điểm số và nhận xét của một lớp ra file Excel để lưu trữ hoặc gửi phụ huynh.</p>
+                <div class="admin-row">
+                  <div class="field">
+                    <label>Chọn lớp cần xuất</label>
+                    <select id="export-class"></select>
+                  </div>
+                  <button class="btn btn-primary btn-small" id="btn-export-excel">Xuất ra Excel</button>
+                </div>
+                <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
               </div>
             </div>
 
-            <div id="student-avatar-list" style="margin-bottom:18px;"></div>
+            <!-- ===== THÀNH VIÊN & THANH TOÁN — Quản lý danh sách thành viên ===== -->
+            <div class="admin-section" data-section="quan-ly-thanh-vien" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Quản lý thành viên</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Danh sách khách hàng &amp; học sinh đã từng đăng nhập ở trang bán hàng (không tính tài khoản Giáo viên), sắp xếp theo lần đăng nhập gần nhất.</p>
 
-            <div id="student-editor" hidden>
-              <h4 style="margin:18px 0 10px;font-size:0.92rem;">Thêm điểm số</h4>
-              <div class="admin-row">
-                <div class="field"><label>Nội dung</label><input type="text" id="score-label" placeholder="Vd: Kiểm tra 15' — Hàm số" /></div>
-                <div class="field" style="max-width:110px;"><label>Điểm</label><input type="text" id="score-value" placeholder="8.5" /></div>
-                <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="score-date" /></div>
-                <button class="btn btn-primary btn-small" id="btn-add-score">Thêm</button>
+                <table class="data-table" id="members-table">
+                  <thead><tr><th>Email</th><th>Loại</th><th>Số lần đăng nhập</th><th>Đăng nhập gần nhất</th><th></th></tr></thead>
+                  <tbody id="members-list-body"></tbody>
+                </table>
+                <p class="empty-note" id="members-list-empty" hidden>Chưa có thành viên nào đăng nhập.</p>
+
+                <div id="member-detail-panel" hidden style="margin-top:20px;border-top:1px solid var(--card-border);padding-top:20px;">
+                  <div class="panel-head">
+                    <h4 id="member-detail-title" style="margin:0;font-size:1rem;"></h4>
+                    <button class="back-link" id="btn-member-detail-close">← Đóng</button>
+                  </div>
+                  <table class="data-table" id="member-purchases-table">
+                    <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Số tiền</th><th>Hình thức</th><th>Thời điểm</th></tr></thead>
+                    <tbody id="member-purchases-body"></tbody>
+                  </table>
+                  <p class="empty-note" id="member-purchases-empty" hidden>Thành viên này chưa mua/dùng sản phẩm nào.</p>
+                </div>
               </div>
-              <table class="data-table" id="score-data-table">
-                <thead><tr><th>Nội dung</th><th>Ngày</th><th>Điểm</th><th></th></tr></thead>
-                <tbody id="score-data-body"></tbody>
-              </table>
+            </div>
 
-              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Thêm nhận xét</h4>
-              <div class="field">
-                <textarea id="comment-text" rows="3" placeholder="Nhận xét về học sinh..."></textarea>
+            <!-- ===== THÀNH VIÊN & THANH TOÁN — Theo dõi học phí ===== -->
+            <div class="admin-section" data-section="hoc-phi" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">💰 Học phí</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Hệ thống tự tạo bản ghi học phí ngày 27 hàng tháng cho 3 lớp học phí tự động và tự hiện QR payOS cho phụ huynh. Bấm vào ô "chưa đóng" để tick tay khi nhận tiền mặt/chuyển khoản trực tiếp.</p>
+
+                <div class="filter-bar" id="tuition-tabs"></div>
+
+                <div id="tuition-summary" style="margin:16px 0;font-size:0.9rem;color:var(--muted);"></div>
+
+                <div style="overflow-x:auto;">
+                  <table class="data-table" id="tuition-table">
+                    <thead><tr id="tuition-table-head"><th>Học sinh</th></tr></thead>
+                    <tbody id="tuition-table-body"></tbody>
+                  </table>
+                </div>
+                <p class="empty-note" id="tuition-table-empty" hidden>Lớp này chưa có bản ghi học phí nào.</p>
               </div>
-              <div class="admin-row">
-                <div class="field" style="max-width:150px;"><label>Ngày</label><input type="date" id="comment-date" /></div>
-                <button class="btn btn-primary btn-small" id="btn-add-comment">Thêm nhận xét</button>
+            </div>
+
+            <!-- ===== THÀNH VIÊN & THANH TOÁN — Quản lý nội dung đăng bán ===== -->
+            <div class="admin-section" data-section="quan-ly-noi-dung" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">📚 Quản lý nội dung đăng bán</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Đăng, sửa hoặc xoá các mục hiển thị trên trang Bài giảng, Tài liệu, Khóa học online và Bài tập Azota.</p>
+
+                <div class="filter-bar" id="content-tabs">
+                  <button class="filter-btn active" data-cat="baigiang">Bài giảng</button>
+                  <button class="filter-btn" data-cat="tailieu">Tài liệu</button>
+                  <button class="filter-btn" data-cat="khoahoc">Khóa học online</button>
+                  <button class="filter-btn" data-cat="azota">Bài tập Azota</button>
+                </div>
+
+                <div class="admin-grid">
+                  <div>
+                    <h4 style="margin:0 0 12px;font-size:0.92rem;" id="content-form-title">Thêm mới — Bài giảng</h4>
+                    <div class="field">
+                      <label>Tiêu đề</label>
+                      <input type="text" id="content-title" placeholder="Vd: Chuyên đề Hàm số — Trọng tâm thi Tốt nghiệp" />
+                    </div>
+                    <div class="field">
+                      <label>Mô tả ngắn</label>
+                      <textarea id="content-desc" rows="2" placeholder="Mô tả ngắn gọn nội dung..."></textarea>
+                    </div>
+                    <div class="admin-row">
+                      <div class="field"><label>Giá hiển thị</label><input type="text" id="content-price" placeholder="Vd: 150.000đ, Miễn phí, Liên hệ" /></div>
+                      <div class="field" style="max-width:190px;"><label>Số tiền (VNĐ)</label><input type="number" id="content-amount" min="0" step="1000" placeholder="Vd: 150000" /></div>
+                      <div class="field"><label>Nhãn/tag (dùng để lọc)</label><input type="text" id="content-tag" placeholder="Vd: Tốt nghiệp" /></div>
+                    </div>
+                    <p style="color:var(--muted);font-size:0.8rem;margin:-6px 0 14px;">
+                      Số tiền dùng để tạo QR thanh toán tự động: điền <strong>0</strong> nếu miễn phí, để <strong>trống</strong> nếu giá "Liên hệ" (nút mua sẽ mở Zalo thay vì QR).
+                    </p>
+                    <div class="admin-row">
+                      <div class="field"><label>Link nội dung (học sinh/khách chỉ thấy SAU KHI đã mua)</label><input type="text" id="content-link-url" placeholder="Vd: link Google Drive, link bài tập Azota" /></div>
+                      <div class="field"><label>Nhãn nút xem nội dung</label><input type="text" id="content-link-label" placeholder="Vd: Làm bài trên Azota →" /></div>
+                    </div>
+                    <div class="admin-row" id="content-zalo-row" hidden>
+                      <div class="field"><label>Link nhóm Zalo khóa học (tự hiện cho học sinh sau khi thanh toán thành công)</label><input type="text" id="content-zalo-link" placeholder="Vd: https://zalo.me/g/xxxxxxx" /></div>
+                    </div>
+                    <p class="field-error" id="content-error"></p>
+                    <div style="display:flex;gap:10px;">
+                      <button class="btn btn-primary btn-small" id="btn-content-save">Thêm mới</button>
+                      <button class="btn btn-outline btn-small" id="btn-content-cancel-edit" hidden>Huỷ sửa</button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 style="margin:0 0 12px;font-size:0.92rem;">Danh sách hiện có</h4>
+                    <table class="data-table" id="content-list-table">
+                      <thead><tr><th>Tiêu đề</th><th>Giá</th><th>Tag</th><th></th></tr></thead>
+                      <tbody id="content-list-body"></tbody>
+                    </table>
+                    <p class="empty-note" id="content-list-empty" hidden>Chưa có mục nào trong danh mục này.</p>
+                  </div>
+                </div>
               </div>
-              <table class="data-table" id="comment-data-table">
-                <thead><tr><th>Ngày</th><th>Nội dung</th><th></th></tr></thead>
-                <tbody id="comment-data-body"></tbody>
-              </table>
+            </div>
 
-              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí cố định hàng tháng (áp dụng mãi mãi cho học sinh này, đến khi xoá)</h4>
-              <div class="admin-row">
-                <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = dùng mặc định 800.000đ)</label><input type="number" id="tuition-fixed" min="0" step="10000" placeholder="Vd: 600000" /></div>
-                <button class="btn btn-outline btn-small" id="btn-save-tuition-fixed">Lưu</button>
+            <!-- ===== KHÁC — Ý kiến phản hồi ===== -->
+            <div class="admin-section" data-section="phan-anh" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">💬 Ý kiến phản hồi</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Phản ánh/yêu cầu gửi từ khu vực lớp học và khu vực khóa học trên website (collection <span class="mono">phan_anh</span>). Bấm "Đánh dấu đã xem" sau khi đã xử lý xong để bớt hiện ở mục "Mới".</p>
+
+                <div class="filter-bar" id="phan-anh-filter">
+                  <button class="filter-btn active" data-filter="moi">Mới</button>
+                  <button class="filter-btn" data-filter="tatca">Tất cả</button>
+                </div>
+
+                <div id="phan-anh-list" style="margin-top:16px;"></div>
+                <p class="empty-note" id="phan-anh-empty" hidden>Chưa có phản ánh nào.</p>
               </div>
-              <p class="field-error" id="tuition-fixed-status"></p>
-
-              <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí riêng (chỉ áp dụng cho lần tính học phí tiếp theo, dùng xong tự xoá)</h4>
-              <div class="admin-row">
-                <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ)</label><input type="number" id="tuition-override" min="0" step="10000" placeholder="Vd: 500000" /></div>
-                <button class="btn btn-outline btn-small" id="btn-save-tuition-override">Lưu</button>
-              </div>
-              <p class="field-error" id="tuition-override-status"></p>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Nhật ký lớp học -->
-        <div class="panel" style="margin-top:22px;" id="journal-form">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">📓 Nhật ký lớp học</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Đăng cập nhật (chữ + ảnh) cho phụ huynh/học sinh xem trong trang cá nhân của các em. Áp dụng cho mọi lớp, kể cả lớp mới tạo sau này.</p>
-
-          <div class="field" style="max-width:320px;">
-            <label>Chọn lớp</label>
-            <select id="journal-class"></select>
-          </div>
-
-          <div id="journal-edit-banner" hidden style="background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;font-size:0.86rem;margin-bottom:14px;align-items:center;justify-content:space-between;gap:10px;">
-            <span>Đang sửa 1 bài viết đã đăng.</span>
-            <button class="back-link" id="btn-journal-cancel-edit">Huỷ sửa</button>
-          </div>
-
-          <div class="field">
-            <label>Nội dung</label>
-            <textarea id="journal-content" rows="4" placeholder="Hôm nay lớp học..."></textarea>
-          </div>
-
-          <div id="journal-kept-images" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
-
-          <div class="admin-row">
-            <div class="field">
-              <label>Thêm ảnh (có thể chọn nhiều)</label>
-              <input type="file" id="journal-images" accept="image/*" multiple />
-            </div>
-            <button class="btn btn-primary btn-small" id="btn-journal-post">Đăng bài</button>
-          </div>
-          <p class="field-error" id="journal-status"></p>
-
-          <h4 style="margin:22px 0 10px;font-size:0.92rem;">Các bài đã đăng</h4>
-          <div id="journal-admin-list"></div>
-        </div>
-
-        <!-- Nhập danh sách hàng loạt từ file Word/Excel -->
-        <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Thêm học sinh hàng loạt theo lớp</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Bấm chọn 1 lớp, sau đó tải lên file danh sách (.xlsx, .csv hoặc .docx). Mã đăng nhập tự tạo theo quy tắc <span class="mono">tênlớp-hotenkhongdau</span> (vd: <span class="mono">12a6-nguyenvana</span>), mật khẩu mặc định cho tất cả là <strong class="mono">123abc</strong>. Sau khi tạo xong, hệ thống tự tải về 1 file Excel danh sách tài khoản vừa tạo.</p>
-
-          <div class="class-grid" id="bulk-class-grid"></div>
-
-          <div id="bulk-import-panel" hidden style="margin-top:22px;border-top:1px solid var(--card-border);padding-top:22px;">
-            <div class="panel-head">
-              <h4 id="bulk-import-class-name" style="margin:0;font-size:1rem;"></h4>
-              <button class="back-link" id="btn-bulk-back">← Chọn lớp khác</button>
             </div>
 
-            <div class="admin-row" style="margin-top:14px;">
-              <div class="field">
-                <label>Chọn file (.xlsx, .csv, .docx)</label>
-                <input type="file" id="import-file" accept=".xlsx,.xls,.csv,.docx" />
-              </div>
-              <button class="btn btn-outline btn-small" id="btn-read-file">Đọc file</button>
-            </div>
-            <p class="field-error" id="import-error"></p>
-
-            <div id="import-preview" hidden>
-              <h4 style="margin:16px 0 10px;font-size:0.92rem;">Xem lại danh sách trước khi tạo (<span id="import-count">0</span> học sinh)</h4>
-              <table class="data-table" id="import-preview-table">
-                <thead><tr><th>Họ tên (bấm để sửa)</th><th>Mã đăng nhập</th><th></th></tr></thead>
-                <tbody id="import-preview-body"></tbody>
-              </table>
-              <button class="btn btn-outline btn-small" id="btn-add-blank-row" style="margin-top:10px;">+ Thêm dòng trống</button>
-              <div style="margin-top:16px;">
-                <button class="btn btn-primary btn-small" id="btn-import-confirm">Tạo tài khoản cho toàn bộ danh sách</button>
-              </div>
-              <p class="field-error" id="import-progress" style="color:var(--chalk);"></p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Xuất điểm ra Excel -->
-        <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">📊 Xuất điểm &amp; nhận xét ra Excel</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Xuất toàn bộ điểm số và nhận xét của một lớp ra file Excel để lưu trữ hoặc gửi phụ huynh.</p>
-          <div class="admin-row">
-            <div class="field">
-              <label>Chọn lớp cần xuất</label>
-              <select id="export-class"></select>
-            </div>
-            <button class="btn btn-primary btn-small" id="btn-export-excel">Xuất ra Excel</button>
-          </div>
-          <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
-        </div>
-
-        <!-- Quản lý danh sách học sinh -->
-        <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">🗂️ Quản lý danh sách học sinh</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 6px;">Chọn lớp để xem danh sách. Tick chọn để xoá nhiều em cùng lúc, hoặc dùng nút riêng để xoá/reset mật khẩu từng em.</p>
-          <p style="color:var(--muted);font-size:0.82rem;margin:0 0 16px;background:var(--paper);border:1px dashed var(--card-border);border-radius:8px;padding:10px 12px;">
-            ⚠️ Lưu ý: thao tác <strong>xoá</strong> làm học sinh mất quyền xem điểm/nhận xét ngay lập tức. Thao tác <strong>reset mật khẩu</strong> sẽ tự tạo lại tài khoản với mật khẩu mặc định <strong class="mono">123abc</strong> và giữ nguyên điểm/nhận xét — nhưng vì giới hạn của hệ thống, <strong>mã đăng nhập của em đó có thể đổi nhẹ</strong> (ví dụ thêm số ở cuối). Hệ thống sẽ hiện mã mới để thầy báo lại cho học sinh.
-          </p>
-
-          <div class="field" style="max-width:320px;">
-            <label>Chọn lớp</label>
-            <select id="delete-class"></select>
-          </div>
-
-          <div id="delete-list-wrap" style="margin-top:14px;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:var(--muted);margin-bottom:8px;">
-              <input type="checkbox" id="delete-select-all" /> Chọn tất cả
-            </label>
-            <div style="overflow-x:auto;">
-              <table class="data-table" id="delete-list-table">
-                <thead><tr><th style="width:34px;"></th><th>Họ tên</th><th>Mã đăng nhập</th><th>Chức vụ</th><th></th></tr></thead>
-                <tbody id="delete-list-body"></tbody>
-              </table>
-            </div>
-            <p class="empty-note" id="delete-list-empty" hidden>Lớp này chưa có học sinh nào.</p>
-          </div>
-
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
-            <button class="btn btn-outline btn-small" id="btn-delete-selected">Xoá học sinh đã chọn</button>
-            <button class="btn btn-primary btn-small" id="btn-delete-whole-class" style="background:var(--pen-red-dark);">Xoá toàn bộ lớp này</button>
-          </div>
-          <p class="field-error" id="delete-status"></p>
-        </div>
-
-        <!-- Học phí -->
-        <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">💰 Học phí</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Hệ thống tự tạo bản ghi học phí ngày 27 hàng tháng cho 3 lớp học phí tự động và tự hiện QR payOS cho phụ huynh. Bấm vào ô "chưa đóng" để tick tay khi nhận tiền mặt/chuyển khoản trực tiếp.</p>
-
-          <div class="filter-bar" id="tuition-tabs"></div>
-
-          <div id="tuition-summary" style="margin:16px 0;font-size:0.9rem;color:var(--muted);"></div>
-
-          <div style="overflow-x:auto;">
-            <table class="data-table" id="tuition-table">
-              <thead><tr id="tuition-table-head"><th>Học sinh</th></tr></thead>
-              <tbody id="tuition-table-body"></tbody>
-            </table>
-          </div>
-          <p class="empty-note" id="tuition-table-empty" hidden>Lớp này chưa có bản ghi học phí nào.</p>
-        </div>
-
-        <!-- Quản lý thành viên -->
-        <div class="panel" style="margin-top:22px;">
-          <h3 style="margin:0 0 6px;font-size:1.05rem;">👥 Quản lý thành viên</h3>
-          <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Danh sách khách hàng &amp; học sinh đã từng đăng nhập ở trang bán hàng (không tính tài khoản Giáo viên), sắp xếp theo lần đăng nhập gần nhất.</p>
-
-          <table class="data-table" id="members-table">
-            <thead><tr><th>Email</th><th>Loại</th><th>Số lần đăng nhập</th><th>Đăng nhập gần nhất</th><th></th></tr></thead>
-            <tbody id="members-list-body"></tbody>
-          </table>
-          <p class="empty-note" id="members-list-empty" hidden>Chưa có thành viên nào đăng nhập.</p>
-
-          <div id="member-detail-panel" hidden style="margin-top:20px;border-top:1px solid var(--card-border);padding-top:20px;">
-            <div class="panel-head">
-              <h4 id="member-detail-title" style="margin:0;font-size:1rem;"></h4>
-              <button class="back-link" id="btn-member-detail-close">← Đóng</button>
-            </div>
-            <table class="data-table" id="member-purchases-table">
-              <thead><tr><th>Sản phẩm</th><th>Danh mục</th><th>Số tiền</th><th>Hình thức</th><th>Thời điểm</th></tr></thead>
-              <tbody id="member-purchases-body"></tbody>
-            </table>
-            <p class="empty-note" id="member-purchases-empty" hidden>Thành viên này chưa mua/dùng sản phẩm nào.</p>
           </div>
         </div>
       </div>
