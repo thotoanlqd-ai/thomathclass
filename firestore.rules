@@ -124,5 +124,13 @@ service cloud.firestore {
       allow read, write: if request.auth != null &&
                              (request.auth.uid == uid || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
     }
+
+    // phan_anh: form "Phản ánh - Yêu cầu" trên website (đồng phục, học phí, lịch học...).
+    // Ai cũng gửi được (kể cả chưa đăng nhập) nhưng KHÔNG đọc/sửa/xoá công khai được,
+    // để bảo mật thông tin phụ huynh/học sinh — chỉ giáo viên xem trong Firebase Console.
+    match /phan_anh/{docId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
   }
 }

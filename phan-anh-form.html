@@ -1,0 +1,297 @@
+<!--
+  ============================================================
+  FORM "PHẢN ÁNH - YÊU CẦU" — ThoMathClass
+  ============================================================
+  Cách dùng:
+  1. Copy toàn bộ khối này (từ <section id="phan-anh"> đến hết
+     </section>, và cả khối <script> bên dưới) vào trang bạn
+     muốn hiển thị form (ví dụ trang "Liên hệ" hoặc trang riêng
+     "phan-anh.html").
+  2. Điền firebaseConfig — dùng ĐÚNG config Firebase bạn đang
+     dùng cho phần payOS/members (nằm sẵn trong repo, thường ở
+     file main.js hoặc firebase-config.js). Không tạo project
+     Firebase mới.
+  3. Vào Firebase Console > Firestore > Rules, thêm quyền cho
+     phép ghi vào collection "phan_anh" (chỉ ghi, không cho đọc
+     công khai để bảo mật thông tin phụ huynh/học sinh):
+
+       match /phan_anh/{docId} {
+         allow create: if true;
+         allow read, update, delete: if false;
+       }
+
+  4. Xem lại các phản ánh trong Firebase Console > Firestore >
+     collection "phan_anh". Nếu muốn có trang admin xem/lọc
+     đẹp hơn (giống trang admin quản lý học viên đang có), báo
+     mình làm thêm — chỉ cần thêm 1 trang đọc dữ liệu, không
+     cần sửa lại form này.
+
+  Gợi ý: đưa file này cho Claude Code trong repo thomathclass,
+  nhờ nó tự điền firebaseConfig và gắn vào đúng vị trí trong
+  trang — Claude Code đã có sẵn context của repo nên sẽ nhanh
+  và chính xác hơn làm thủ công.
+  ============================================================
+-->
+
+<section id="phan-anh">
+  <style>
+    #phan-anh {
+      --pa-ink: #1c2340;
+      --pa-ink-soft: #4a5178;
+      --pa-paper: #fbf9f4;
+      --pa-line: #e2ddd0;
+      --pa-amber: #c8862a;
+      --pa-amber-deep: #9c6414;
+      --pa-good: #2f7d5e;
+      --pa-radius: 10px;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 24px 48px;
+      font-family: -apple-system, "Segoe UI", Roboto, "Inter", sans-serif;
+      color: var(--pa-ink);
+      background: var(--pa-paper);
+      border: 1px solid var(--pa-line);
+      border-radius: 16px;
+      box-sizing: border-box;
+    }
+    #phan-anh * { box-sizing: border-box; }
+
+    #phan-anh .pa-eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--pa-amber-deep);
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+    #phan-anh h2 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      line-height: 1.25;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+    #phan-anh .pa-sub {
+      margin: 0 0 28px;
+      color: var(--pa-ink-soft);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    #phan-anh .pa-field { margin-bottom: 18px; }
+    #phan-anh label {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--pa-ink);
+    }
+    #phan-anh .pa-hint {
+      font-weight: 400;
+      color: var(--pa-ink-soft);
+      font-size: 12.5px;
+      margin-left: 4px;
+    }
+    #phan-anh input[type="text"],
+    #phan-anh input[type="tel"],
+    #phan-anh select,
+    #phan-anh textarea {
+      width: 100%;
+      padding: 11px 13px;
+      font-size: 15px;
+      font-family: inherit;
+      color: var(--pa-ink);
+      background: #fff;
+      border: 1.5px solid var(--pa-line);
+      border-radius: var(--pa-radius);
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    #phan-anh input:focus,
+    #phan-anh select:focus,
+    #phan-anh textarea:focus {
+      border-color: var(--pa-amber);
+    }
+    #phan-anh textarea { min-height: 96px; resize: vertical; }
+
+    #phan-anh .pa-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 480px) {
+      #phan-anh .pa-row { grid-template-columns: 1fr; }
+      #phan-anh { padding: 28px 16px 36px; }
+    }
+
+    #phan-anh .pa-submit {
+      width: 100%;
+      margin-top: 8px;
+      padding: 13px 20px;
+      font-size: 15.5px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--pa-amber-deep);
+      border: none;
+      border-radius: var(--pa-radius);
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+    #phan-anh .pa-submit:hover { background: #85530f; }
+    #phan-anh .pa-submit:active { transform: translateY(1px); }
+    #phan-anh .pa-submit:disabled {
+      background: #c9bfa8;
+      cursor: not-allowed;
+    }
+
+    #phan-anh .pa-note {
+      margin-top: 12px;
+      font-size: 12.5px;
+      color: var(--pa-ink-soft);
+      text-align: center;
+    }
+
+    #phan-anh .pa-status {
+      display: none;
+      margin-top: 16px;
+      padding: 13px 16px;
+      border-radius: var(--pa-radius);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    #phan-anh .pa-status.pa-ok {
+      display: block;
+      background: #eaf5ef;
+      color: var(--pa-good);
+      border: 1px solid #bfe3cf;
+    }
+    #phan-anh .pa-status.pa-err {
+      display: block;
+      background: #fbeaea;
+      color: #a53030;
+      border: 1px solid #f0c4c4;
+    }
+  </style>
+
+  <p class="pa-eyebrow">ThoMathClass</p>
+  <h2>Phản ánh - Yêu cầu</h2>
+  <p class="pa-sub">
+    Phụ huynh / học sinh gửi phản ánh hoặc yêu cầu tại đây (đồng phục cần
+    đổi/trả, học phí, lịch học...) — thay vì nhắn Zalo, giúp giáo viên
+    chủ nhiệm theo dõi và xử lý nhanh hơn.
+  </p>
+
+  <form id="pa-form">
+    <div class="pa-field">
+      <label for="pa-loai">Loại phản ánh / yêu cầu</label>
+      <select id="pa-loai" required>
+        <option value="" disabled selected>-- Chọn loại --</option>
+        <option value="Đồng phục">Đồng phục (đổi size / trả / lỗi)</option>
+        <option value="Học phí">Học phí</option>
+        <option value="Lịch học">Lịch học / xin nghỉ</option>
+        <option value="Tài liệu">Tài liệu / bài tập</option>
+        <option value="Khác">Khác</option>
+      </select>
+    </div>
+
+    <div class="pa-row">
+      <div class="pa-field">
+        <label for="pa-ten-ph">Họ và tên phụ huynh</label>
+        <input type="text" id="pa-ten-ph" required autocomplete="name" />
+      </div>
+      <div class="pa-field">
+        <label for="pa-ten-hs">Họ và tên học sinh</label>
+        <input type="text" id="pa-ten-hs" required />
+      </div>
+    </div>
+
+    <div class="pa-row">
+      <div class="pa-field">
+        <label for="pa-lop">Lớp</label>
+        <input type="text" id="pa-lop" placeholder="VD: X5 - K62 - LQĐ" required />
+      </div>
+      <div class="pa-field">
+        <label for="pa-sdt">Số điện thoại liên hệ</label>
+        <input type="tel" id="pa-sdt" required autocomplete="tel" />
+      </div>
+    </div>
+
+    <div class="pa-field">
+      <label for="pa-noidung">
+        Nội dung chi tiết <span class="pa-hint">(size hiện tại/size cần đổi, lý do, thời gian mong muốn xử lý...)</span>
+      </label>
+      <textarea id="pa-noidung" required></textarea>
+    </div>
+
+    <button type="submit" class="pa-submit" id="pa-submit-btn">Gửi phản ánh</button>
+    <p class="pa-note">Thông tin chỉ giáo viên chủ nhiệm xem được, không công khai.</p>
+    <div class="pa-status" id="pa-status"></div>
+  </form>
+</section>
+
+<!--
+  Firebase SDK (compat build — đơn giản, không cần bundler,
+  phù hợp GitHub Pages tĩnh). Nếu trang đã load Firebase SDK ở
+  chỗ khác rồi thì bỏ 2 dòng <script src> này đi để tránh load
+  trùng.
+-->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+  (function () {
+    // ĐIỀN firebaseConfig THẬT của bạn vào đây — copy nguyên
+    // từ file cấu hình Firebase đang dùng cho payOS/members,
+    // KHÔNG tạo project mới.
+    const firebaseConfig = {
+      apiKey: "AIzaSyCiLVgORcb1NBuLGI0UrThbcLNP47Ub3Ss",
+      authDomain: "thomathclass.firebaseapp.com",
+      projectId: "thomathclass",
+      storageBucket: "thomathclass.firebasestorage.app",
+      messagingSenderId: "1076472930743",
+      appId: "1:1076472930743:web:e71646a2c10b3031e30832",
+    };
+
+    // Tránh khởi tạo lại nếu trang đã có firebase.initializeApp() ở chỗ khác.
+    if (!window.firebase.apps || !window.firebase.apps.length) {
+      window.firebase.initializeApp(firebaseConfig);
+    }
+    const db = window.firebase.firestore();
+
+    const form = document.getElementById("pa-form");
+    const btn = document.getElementById("pa-submit-btn");
+    const status = document.getElementById("pa-status");
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      btn.disabled = true;
+      btn.textContent = "Đang gửi...";
+      status.className = "pa-status";
+      status.textContent = "";
+
+      const data = {
+        loai: document.getElementById("pa-loai").value,
+        tenPhuHuynh: document.getElementById("pa-ten-ph").value.trim(),
+        tenHocSinh: document.getElementById("pa-ten-hs").value.trim(),
+        lop: document.getElementById("pa-lop").value.trim(),
+        soDienThoai: document.getElementById("pa-sdt").value.trim(),
+        noiDung: document.getElementById("pa-noidung").value.trim(),
+        trangThai: "Mới",
+        thoiGianGui: window.firebase.firestore.FieldValue.serverTimestamp(),
+      };
+
+      try {
+        await db.collection("phan_anh").add(data);
+        status.className = "pa-status pa-ok";
+        status.textContent = "Đã gửi thành công! Giáo viên chủ nhiệm sẽ xem và phản hồi sớm nhất.";
+        form.reset();
+      } catch (err) {
+        status.className = "pa-status pa-err";
+        status.textContent = "Có lỗi khi gửi, vui lòng thử lại hoặc nhắn Zalo trực tiếp.";
+        console.error("Lỗi gửi phản ánh:", err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Gửi phản ánh";
+      }
+    });
+  })();
+</script>
