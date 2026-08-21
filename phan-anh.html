@@ -280,10 +280,20 @@
 
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
 <script src="script.js"></script>
 <script>
   (function () {
+    const firebaseConfig = {
+      apiKey: "AIzaSyCiLVgORcb1NBuLGI0UrThbcLNP47Ub3Ss",
+      authDomain: "thomathclass.firebaseapp.com",
+      projectId: "thomathclass",
+      storageBucket: "thomathclass.firebasestorage.app",
+      messagingSenderId: "1076472930743",
+      appId: "1:1076472930743:web:e71646a2c10b3031e30832",
+    };
+    if (!window.firebase.apps || !window.firebase.apps.length) {
+      window.firebase.initializeApp(firebaseConfig);
+    }
     const db = window.firebase.firestore();
 
     const form = document.getElementById("pa-form");
