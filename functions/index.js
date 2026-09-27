@@ -97,26 +97,29 @@ exports.generateMonthlyTuition = onSchedule(
       const studentData = studentSnap.exists ? studentSnap.data() : {};
       const override = studentData.nextMonthTuitionOverride;
       const fixedAmount = studentData.fixedTuitionAmount;
+      // 0 là hợp lệ (học sinh được miễn học phí) — chỉ rơi về mặc định khi chưa đặt
       const amount =
-        typeof override === "number" && override > 0
+        typeof override === "number" && override >= 0
           ? override
-          : typeof fixedAmount === "number" && fixedAmount > 0
+          : typeof fixedAmount === "number" && fixedAmount >= 0
           ? fixedAmount
           : DEFAULT_TUITION_AMOUNT;
+      const isFree = amount === 0;
 
       await tuitionRef.set({
         classId,
         studentId,
         month,
         amount,
-        status: "chưa đóng",
+        // Miễn học phí: ghi luôn "đã đóng" để phụ huynh không thấy nút đóng tiền
+        status: isFree ? "đã đóng" : "chưa đóng",
         note: null,
         currentOrderCode: null,
         currentQrCode: null,
         currentCheckoutUrl: null,
         qrExpiredAt: null,
-        paidAt: null,
-        paidMethod: null,
+        paidAt: isFree ? admin.firestore.FieldValue.serverTimestamp() : null,
+        paidMethod: isFree ? "free" : null,
         paidOrderCode: null,
         paidNote: null,
         possibleDuplicate: false,

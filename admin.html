@@ -209,7 +209,7 @@
 
                   <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí cố định hàng tháng (áp dụng mãi mãi cho học sinh này, đến khi xoá)</h4>
                   <div class="admin-row">
-                    <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = dùng mặc định 800.000đ)</label><input type="number" id="tuition-fixed" min="0" step="10000" placeholder="Vd: 600000" /></div>
+                    <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ, 0 = miễn)</label><input type="number" id="tuition-fixed" min="0" step="10000" placeholder="Vd: 600000" /></div>
                     <button class="btn btn-outline btn-small" id="btn-save-tuition-fixed">Lưu</button>
                   </div>
                   <p class="field-error" id="tuition-fixed-status"></p>
@@ -342,6 +342,18 @@
               <div class="panel">
                 <h3 style="margin:0 0 6px;font-size:1.05rem;">💰 Học phí</h3>
                 <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Hệ thống tự tạo bản ghi học phí ngày 27 hàng tháng cho 3 lớp học phí tự động và tự hiện QR payOS cho phụ huynh. Bấm vào ô "chưa đóng" để tick tay khi nhận tiền mặt/chuyển khoản trực tiếp.</p>
+
+                <div style="border:1px solid var(--card-border);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+                  <h4 style="margin:0 0 6px;font-size:0.92rem;">Đổi số tiền 1 tháng cho cả 3 lớp</h4>
+                  <p style="color:var(--muted);font-size:0.82rem;margin:0 0 10px;">Áp dụng cho mọi khoản <strong>chưa đóng</strong> của tháng đã chọn. Học sinh có "học phí cố định" = 0 sẽ được ghi là miễn (đã đóng). Khoản đã đóng không bị đổi.</p>
+                  <div class="admin-row">
+                    <div class="field" style="max-width:150px;"><label>Tháng</label><input type="month" id="tuition-bulk-month" /></div>
+                    <div class="field" style="max-width:170px;"><label>Số tiền (VNĐ)</label><input type="number" id="tuition-bulk-amount" min="0" step="10000" placeholder="Vd: 600000" /></div>
+                    <div class="field" style="flex:1;min-width:200px;"><label>Ghi chú hiện cho phụ huynh</label><input type="text" id="tuition-bulk-note" placeholder="Vd: Nghỉ 1 tuần khai giảng" /></div>
+                    <button class="btn btn-outline btn-small" id="btn-tuition-bulk">Áp dụng</button>
+                  </div>
+                  <p class="field-error" id="tuition-bulk-status"></p>
+                </div>
 
                 <div class="filter-bar" id="tuition-tabs"></div>
 

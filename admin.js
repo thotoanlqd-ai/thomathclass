@@ -1626,7 +1626,89 @@ function initTuitionPanel() {
   });
   currentTuitionClassId = TUITION_CLASS_IDS[0];
   loadTuitionTable(currentTuitionClassId);
+  document.getElementById("tuition-bulk-month").value = currentMonthKeyAdmin();
 }
+
+// Đổi số tiền cho mọi khoản chưa đóng của 1 tháng (3 lớp). Học sinh có fixedTuitionAmount = 0
+// được ghi miễn (đã đóng). QR cũ bị cho hết hạn để lần bấm "Đóng học phí" sau tạo QR đúng số tiền mới —
+// giữ nguyên currentOrderCode để nếu phụ huynh đang quét dở QR cũ thì webhook vẫn khớp được.
+document.getElementById("btn-tuition-bulk").addEventListener("click", () => {
+  const statusEl = document.getElementById("tuition-bulk-status");
+  const month = document.getElementById("tuition-bulk-month").value;
+  const rawAmount = document.getElementById("tuition-bulk-amount").value.trim();
+  const note = document.getElementById("tuition-bulk-note").value.trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    statusEl.textContent = "Chọn tháng.";
+    return;
+  }
+  if (rawAmount === "" || isNaN(Number(rawAmount)) || Number(rawAmount) < 0) {
+    statusEl.textContent = "Số tiền phải là số không âm.";
+    return;
+  }
+  const amount = Number(rawAmount);
+  if (
+    !confirm(
+      `Đặt học phí tháng ${tuitionMonthLabelAdmin(month)} = ${amount.toLocaleString("vi-VN")}đ cho mọi khoản chưa đóng của 3 lớp?`
+    )
+  )
+    return;
+  statusEl.textContent = "Đang cập nhật...";
+
+  Promise.all([
+    db.collection("tuition").where("month", "==", month).get(),
+    db.collection("roster").where("classId", "in", TUITION_CLASS_IDS).get(),
+  ])
+    .then(([tuitionSnap, rosterSnap]) => {
+      const names = {};
+      rosterSnap.forEach((d) => (names[d.id] = d.data().fullName));
+      const docs = tuitionSnap.docs.filter((d) => TUITION_CLASS_IDS.indexOf(d.data().classId) !== -1);
+      return Promise.all(
+        docs.map((d) =>
+          db.collection("students").doc(d.data().studentId).get().then((s) => ({ doc: d, student: s.exists ? s.data() : {} }))
+        )
+      ).then((rows) => ({ rows, names }));
+    })
+    .then(({ rows, names }) => {
+      const batch = db.batch();
+      let changed = 0;
+      let skippedPaid = 0;
+      const freeNames = [];
+      rows.forEach(({ doc, student }) => {
+        const d = doc.data();
+        const isFree = student.fixedTuitionAmount === 0;
+        if (d.status === "đã đóng") {
+          if (!(isFree && d.paidMethod === "free")) skippedPaid++;
+          return;
+        }
+        if (isFree) {
+          batch.update(doc.ref, {
+            amount: 0,
+            status: "đã đóng",
+            paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+            paidMethod: "free",
+            paidNote: "Miễn học phí",
+            qrExpiredAt: null,
+          });
+          freeNames.push(names[d.studentId] || d.studentId);
+        } else {
+          batch.update(doc.ref, { amount, note: note || null, qrExpiredAt: null });
+        }
+        changed++;
+      });
+      return batch.commit().then(() => ({ changed, skippedPaid, freeNames }));
+    })
+    .then(({ changed, skippedPaid, freeNames }) => {
+      statusEl.textContent =
+        `✓ Đã cập nhật ${changed} khoản.` +
+        (freeNames.length ? ` Miễn học phí: ${freeNames.join(", ")}.` : "") +
+        (skippedPaid ? ` ${skippedPaid} khoản đã đóng trước đó — không đổi (kiểm tra nếu cần hoàn tiền chênh lệch).` : "");
+      loadTuitionTable(currentTuitionClassId);
+    })
+    .catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
 
 function loadTuitionTable(classId) {
   const summaryEl = document.getElementById("tuition-summary");
@@ -1694,7 +1776,8 @@ function loadTuitionTable(classId) {
             const warn = rec.possibleDuplicate
               ? ' <span title="Có thể nhận trùng tiền cho tháng này, kiểm tra lại!">⚠️</span>'
               : "";
-            rowHtml += `<td style="text-align:center;color:var(--chalk);">✓${warn}</td>`;
+            const mark = rec.paidMethod === "free" ? "miễn" : "✓";
+            rowHtml += `<td style="text-align:center;color:var(--chalk);">${mark}${warn}</td>`;
           } else {
             rowHtml += `<td style="text-align:center;"><button class="mini-btn" data-uid="${s.uid}" data-month="${m}">chưa đóng</button></td>`;
           }
