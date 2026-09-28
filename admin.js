@@ -12,6 +12,7 @@ const secondaryAuth = secondaryApp.auth();
 
 let currentStudentUid = null;
 let currentStudentData = null;
+let currentStudentClassId = null;
 
 // ---------- Đăng nhập Giáo viên ----------
 document.getElementById("btn-admin-login").addEventListener("click", () => {
@@ -119,6 +120,7 @@ function initAdminPanel() {
   initTuitionPanel();
   initAdminSidebar();
   initPhanAnhPanel();
+  initRenLuyenSettings();
 }
 
 // ==========================================================
@@ -223,9 +225,11 @@ document.getElementById("pick-class").addEventListener("change", (e) => {
 });
 
 function loadStudentPicker(classId) {
+  currentStudentClassId = classId;
   const pickStudent = document.getElementById("pick-student");
   pickStudent.innerHTML = '<option value="">— Đang tải... —</option>';
   document.getElementById("student-editor").hidden = true;
+  document.getElementById("renluyen-panel").hidden = true;
 
   db.collection("roster")
     .where("classId", "==", classId)
@@ -251,6 +255,7 @@ document.getElementById("pick-student").addEventListener("change", (e) => {
   filterStudentAvatarList(uid);
   if (!uid) {
     document.getElementById("student-editor").hidden = true;
+    document.getElementById("renluyen-panel").hidden = true;
     return;
   }
   currentStudentUid = uid;
@@ -276,6 +281,13 @@ function loadStudentEditor(uid) {
           : currentStudentData.fixedTuitionAmount;
       document.getElementById("tuition-fixed-status").textContent = "";
       document.getElementById("student-editor").hidden = false;
+
+      if (currentStudentClassId === RENLUYEN_CLASS_ID) {
+        document.getElementById("renluyen-panel").hidden = false;
+        loadRenLuyenAdminPanel(uid);
+      } else {
+        document.getElementById("renluyen-panel").hidden = true;
+      }
     });
 }
 
@@ -971,55 +983,140 @@ document.getElementById("btn-export-excel").addEventListener("click", () => {
     .orderBy("order")
     .get()
     .then((rosterSnap) => {
-      const studentUids = [];
-      rosterSnap.forEach((doc) => studentUids.push(doc.id));
+      const students = [];
+      rosterSnap.forEach((doc) => students.push({ uid: doc.id, fullName: doc.data().fullName }));
 
-      if (!studentUids.length) {
+      if (!students.length) {
         statusEl.textContent = "Lớp này chưa có học sinh nào.";
         return null;
       }
 
-      return Promise.all(studentUids.map((uid) => db.collection("students").doc(uid).get())).then(
-        (studentDocs) => {
-          const scoreRows = [];
-          const commentRows = [];
-
-          studentDocs.forEach((doc) => {
-            if (!doc.exists) return;
-            const d = doc.data();
-            const scores = d.scores || [];
-            const comments = d.comments || [];
-
-            if (scores.length === 0) {
-              scoreRows.push({ "Họ tên": d.fullName, "Nội dung": "", "Ngày": "", "Điểm": "" });
-            } else {
-              scores.forEach((s) => {
-                scoreRows.push({ "Họ tên": d.fullName, "Nội dung": s.label, "Ngày": s.date || "", "Điểm": s.value });
-              });
-            }
-
-            comments.forEach((c) => {
-              commentRows.push({ "Họ tên": d.fullName, "Ngày": c.date || "", "Nhận xét": c.text });
-            });
-          });
-
-          const wb = XLSX.utils.book_new();
-          const scoreSheet = XLSX.utils.json_to_sheet(scoreRows);
-          const commentSheet = XLSX.utils.json_to_sheet(commentRows.length ? commentRows : [{ "Họ tên": "", "Ngày": "", "Nhận xét": "" }]);
-          XLSX.utils.book_append_sheet(wb, scoreSheet, "Điểm số");
-          XLSX.utils.book_append_sheet(wb, commentSheet, "Nhận xét");
-
-          const today = new Date().toISOString().slice(0, 10);
-          XLSX.writeFile(wb, `Diem_${className.replace(/\s+/g, "")}_${today}.xlsx`);
-          statusEl.textContent = "Đã xuất file Excel thành công.";
-        }
-      );
+      if (classId === RENLUYEN_CLASS_ID) {
+        return exportRenLuyenVaHocTapExcel(students, className, statusEl);
+      }
+      return exportDiemVaNhanXetExcel(students, className, statusEl);
     })
     .catch((err) => {
       console.error(err);
       statusEl.textContent = "Có lỗi khi xuất file: " + err.message;
     });
 });
+
+// Xuất Excel như cũ (2 sheet: Điểm số, Nhận xét) — dùng cho MỌI lớp trừ 10C5.
+function exportDiemVaNhanXetExcel(students, className, statusEl) {
+  return Promise.all(students.map((s) => db.collection("students").doc(s.uid).get())).then((studentDocs) => {
+    const scoreRows = [];
+    const commentRows = [];
+
+    studentDocs.forEach((doc) => {
+      if (!doc.exists) return;
+      const d = doc.data();
+      const scores = d.scores || [];
+      const comments = d.comments || [];
+
+      if (scores.length === 0) {
+        scoreRows.push({ "Họ tên": d.fullName, "Nội dung": "", "Ngày": "", "Điểm": "" });
+      } else {
+        scores.forEach((s) => {
+          scoreRows.push({ "Họ tên": d.fullName, "Nội dung": s.label, "Ngày": s.date || "", "Điểm": s.value });
+        });
+      }
+
+      comments.forEach((c) => {
+        commentRows.push({ "Họ tên": d.fullName, "Ngày": c.date || "", "Nhận xét": c.text });
+      });
+    });
+
+    const wb = XLSX.utils.book_new();
+    const scoreSheet = XLSX.utils.json_to_sheet(scoreRows);
+    const commentSheet = XLSX.utils.json_to_sheet(commentRows.length ? commentRows : [{ "Họ tên": "", "Ngày": "", "Nhận xét": "" }]);
+    XLSX.utils.book_append_sheet(wb, scoreSheet, "Điểm số");
+    XLSX.utils.book_append_sheet(wb, commentSheet, "Nhận xét");
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Diem_${className.replace(/\s+/g, "")}_${today}.xlsx`);
+    statusEl.textContent = "Đã xuất file Excel thành công.";
+  });
+}
+
+// Xuất Excel riêng cho lớp 10C5 — 2 sheet: "Điểm rèn luyện" (trước) rồi "Điểm học tập"
+// (gộp Điểm số + Nhận xét, có cột "Loại" để phân biệt từng dòng).
+function exportRenLuyenVaHocTapExcel(students, className, statusEl) {
+  return getRenLuyenConfig().then((cfg) => {
+    const hocKyHienTai = cfg.hocKyHienTai || "";
+    const capHocKy = capHocKyTrongNam(hocKyHienTai);
+
+    return Promise.all([
+      Promise.all(students.map((s) => db.collection("renluyenTong").doc(s.uid).get())),
+      Promise.all(
+        students.map((s) =>
+          hocKyHienTai
+            ? db.collection("students").doc(s.uid).collection("renluyen").where("hocKy", "==", hocKyHienTai).get()
+            : Promise.resolve(null)
+        )
+      ),
+      Promise.all(students.map((s) => db.collection("students").doc(s.uid).get())),
+    ]).then(([tongDocs, renluyenSnaps, studentDocs]) => {
+      const cotCong = "Tổng điểm cộng (" + (hocKyHienTai || "chưa đặt học kỳ") + ")";
+      const cotTru = "Tổng điểm trừ (" + (hocKyHienTai || "chưa đặt học kỳ") + ")";
+
+      const renluyenRows = students.map((s, idx) => {
+        const tong = tongDocs[idx].exists ? tongDocs[idx].data() || {} : {};
+        const diemHK1 = typeof tong[capHocKy.hk1] === "number" ? tong[capHocKy.hk1] : 0;
+        const diemHK2 = capHocKy.hk2 && typeof tong[capHocKy.hk2] === "number" ? tong[capHocKy.hk2] : 0;
+
+        let tongCong = 0;
+        let tongTru = 0;
+        if (renluyenSnaps[idx]) {
+          renluyenSnaps[idx].forEach((doc) => {
+            const d = doc.data();
+            if (d.huy) return;
+            if (d.diem > 0) tongCong += d.diem;
+            else if (d.diem < 0) tongTru += d.diem;
+          });
+        }
+
+        const row = {
+          STT: idx + 1,
+          "Họ và tên": s.fullName,
+          "Điểm HK1": diemHK1,
+          "Điểm HK2": diemHK2,
+          "Điểm cả năm": diemHK1 + diemHK2,
+        };
+        row[cotCong] = tongCong;
+        row[cotTru] = tongTru;
+        return row;
+      });
+
+      const hocTapRows = [];
+      studentDocs.forEach((doc, idx) => {
+        const fullName = students[idx].fullName;
+        if (!doc.exists) return;
+        const d = doc.data();
+        const scores = d.scores || [];
+        const comments = d.comments || [];
+        scores.forEach((sc) => {
+          hocTapRows.push({ "Họ tên": fullName, Loại: "Điểm số", "Nội dung": sc.label, Ngày: sc.date || "", Điểm: sc.value });
+        });
+        comments.forEach((c) => {
+          hocTapRows.push({ "Họ tên": fullName, Loại: "Nhận xét", "Nội dung": c.text, Ngày: c.date || "", Điểm: "" });
+        });
+      });
+
+      const wb = XLSX.utils.book_new();
+      const renluyenSheet = XLSX.utils.json_to_sheet(renluyenRows);
+      const hocTapSheet = XLSX.utils.json_to_sheet(
+        hocTapRows.length ? hocTapRows : [{ "Họ tên": "", Loại: "", "Nội dung": "", Ngày: "", Điểm: "" }]
+      );
+      XLSX.utils.book_append_sheet(wb, renluyenSheet, "Điểm rèn luyện");
+      XLSX.utils.book_append_sheet(wb, hocTapSheet, "Điểm học tập");
+
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Diem_${className.replace(/\s+/g, "")}_${today}.xlsx`);
+      statusEl.textContent = "Đã xuất file Excel thành công.";
+    });
+  });
+}
 
 // ==========================================================
 // XOÁ HỌC SINH: xoá lẻ / nhiều / cả lớp
@@ -1936,5 +2033,381 @@ function markPhanAnhSeen(id) {
     .catch((err) => {
       console.error("Lỗi khi đánh dấu đã xem:", err);
       alert("Có lỗi khi cập nhật, thầy thử lại nhé.");
+    });
+}
+
+// ==========================================================
+// ĐIỂM RÈN LUYỆN (chỉ áp dụng lớp 10C5) — panel trong "Quản lý danh sách học sinh"
+// ==========================================================
+let renLuyenPanelHocKy = "";
+
+function loadRenLuyenAdminPanel(uid) {
+  const statusEl = document.getElementById("renluyen-status");
+  statusEl.textContent = "";
+  document.getElementById("renluyen-diem-input").value = "";
+  document.getElementById("renluyen-lydo-input").value = "";
+  document.getElementById("renluyen-diem-lon").textContent = "…";
+  document.getElementById("renluyen-hocky-label").textContent = "";
+  document.getElementById("renluyen-quick-buttons").innerHTML = "";
+  document.getElementById("renluyen-history-body").innerHTML = "";
+  document.getElementById("renluyen-history-empty").hidden = true;
+
+  getRenLuyenConfig().then((cfg) => {
+    if (uid !== currentStudentUid) return; // đã chuyển sang học sinh khác trong lúc chờ tải
+    renLuyenPanelHocKy = cfg.hocKyHienTai;
+    document.getElementById("renluyen-hocky-label").textContent = cfg.hocKyHienTai || "(chưa đặt học kỳ hiện tại)";
+    renderRenLuyenQuickButtons(document.getElementById("renluyen-quick-buttons"), cfg.nutNhanh, (diem, label) => {
+      document.getElementById("renluyen-diem-input").value = diem;
+      document.getElementById("renluyen-lydo-input").value = label;
+    });
+
+    if (!cfg.hocKyHienTai) {
+      document.getElementById("renluyen-diem-lon").textContent = "0";
+      statusEl.textContent = 'Chưa đặt "Học kỳ hiện tại" — vào mục Cài đặt điểm rèn luyện để đặt trước khi chấm.';
+      return;
+    }
+
+    Promise.all([
+      db.collection("renluyenTong").doc(uid).get(),
+      db
+        .collection("students")
+        .doc(uid)
+        .collection("renluyen")
+        .where("hocKy", "==", cfg.hocKyHienTai)
+        .orderBy("thoiGian", "desc")
+        .get(),
+    ]).then(([tongDoc, historySnap]) => {
+      if (uid !== currentStudentUid) return;
+      const tong = tongDoc.exists ? tongDoc.data() || {} : {};
+      const diemHienTai = typeof tong[cfg.hocKyHienTai] === "number" ? tong[cfg.hocKyHienTai] : 0;
+      const diemEl = document.getElementById("renluyen-diem-lon");
+      diemEl.textContent = formatDiemRenLuyen(diemHienTai);
+      diemEl.style.color = diemHienTai > 0 ? "var(--chalk)" : diemHienTai < 0 ? "var(--pen-red)" : "var(--muted)";
+
+      renderRenLuyenHistory(uid, historySnap.docs, true);
+    });
+  });
+}
+
+function renderRenLuyenQuickButtons(container, list, onPick) {
+  container.innerHTML = "";
+  (list || []).forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-outline btn-small";
+    btn.textContent = formatDiemRenLuyen(item.diem) + " " + item.label;
+    btn.addEventListener("click", () => onPick(item.diem, item.label));
+    container.appendChild(btn);
+  });
+}
+
+function renderRenLuyenHistory(uid, docs, allowCancel) {
+  const body = document.getElementById("renluyen-history-body");
+  const emptyEl = document.getElementById("renluyen-history-empty");
+  body.innerHTML = "";
+  if (!docs.length) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  docs.forEach((doc) => {
+    const d = doc.data();
+    const tr = document.createElement("tr");
+    if (d.huy) tr.style.opacity = "0.55";
+    const timeStr = d.thoiGian ? new Date(d.thoiGian.toMillis()).toLocaleString("vi-VN") : "—";
+    const diemStr = formatDiemRenLuyen(d.diem);
+    const huyNote = d.huy
+      ? ' <span style="text-decoration:line-through;color:var(--muted);">(đã huỷ' + (d.huyLyDo ? ": " + escapeHtml(d.huyLyDo) : "") + ")</span>"
+      : "";
+    const tdTime = document.createElement("td");
+    tdTime.textContent = timeStr;
+    const tdDiem = document.createElement("td");
+    tdDiem.textContent = diemStr;
+    tdDiem.style.fontFamily = "'JetBrains Mono', monospace";
+    tdDiem.style.fontWeight = "700";
+    tdDiem.style.color = d.diem > 0 ? "var(--chalk)" : "var(--pen-red)";
+    const tdLyDo = document.createElement("td");
+    tdLyDo.innerHTML = escapeHtml(d.lyDo || "") + huyNote;
+    const tdNguoi = document.createElement("td");
+    tdNguoi.textContent = d.nguoiChamTen || "";
+    const tdAction = document.createElement("td");
+    tr.appendChild(tdTime);
+    tr.appendChild(tdDiem);
+    tr.appendChild(tdLyDo);
+    tr.appendChild(tdNguoi);
+    tr.appendChild(tdAction);
+    if (allowCancel && !d.huy) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mini-btn";
+      btn.textContent = "Huỷ lượt này";
+      btn.addEventListener("click", () => onHuyLuotCham(uid, doc.id));
+      tdAction.appendChild(btn);
+    }
+    body.appendChild(tr);
+  });
+}
+
+function onHuyLuotCham(uid, entryId) {
+  const lyDo = window.prompt("Lý do huỷ lượt chấm này (có thể để trống):", "") || "";
+  if (!window.confirm("Xác nhận huỷ lượt chấm này? Điểm sẽ được trừ lại khỏi tổng.")) return;
+  huyLuotChamRenLuyen(uid, entryId, ADMIN_UID, lyDo)
+    .then(() => loadRenLuyenAdminPanel(uid))
+    .catch((err) => {
+      console.error(err);
+      alert("Lỗi khi huỷ: " + err.message);
+    });
+}
+
+document.getElementById("btn-renluyen-save").addEventListener("click", () => {
+  const statusEl = document.getElementById("renluyen-status");
+  if (!currentStudentUid) return;
+  if (!renLuyenPanelHocKy) {
+    statusEl.textContent = 'Chưa đặt "Học kỳ hiện tại" trong Cài đặt điểm rèn luyện.';
+    return;
+  }
+  const diemRaw = document.getElementById("renluyen-diem-input").value.trim();
+  const lyDo = document.getElementById("renluyen-lydo-input").value.trim();
+  const diem = Number(diemRaw);
+  if (diemRaw === "" || isNaN(diem) || diem === 0) {
+    statusEl.textContent = "Điểm phải là số khác 0 (vd: -1 hoặc 2).";
+    return;
+  }
+  if (!lyDo) {
+    statusEl.textContent = "Nhập lý do.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  themLuotChamRenLuyen(currentStudentUid, diem, lyDo, renLuyenPanelHocKy, ADMIN_UID, "Giáo viên")
+    .then(() => {
+      document.getElementById("renluyen-diem-input").value = "";
+      document.getElementById("renluyen-lydo-input").value = "";
+      statusEl.textContent = "✓ Đã lưu.";
+      loadRenLuyenAdminPanel(currentStudentUid);
+    })
+    .catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
+
+// ==========================================================
+// CÀI ĐẶT ĐIỂM RÈN LUYỆN — học kỳ hiện tại / người được giao quyền / nút chấm nhanh
+// ==========================================================
+function initRenLuyenSettings() {
+  loadRenLuyenSettingsPanel();
+  document.getElementById("btn-renluyen-cfg-hocky-save").addEventListener("click", saveRenLuyenHocKyHienTai);
+  document.getElementById("btn-renluyen-cfg-add-grader").addEventListener("click", addRenLuyenGrader);
+  document.getElementById("btn-renluyen-cfg-quick-add").addEventListener("click", addRenLuyenQuickButton);
+}
+
+function loadRenLuyenSettingsPanel() {
+  Promise.all([renLuyenConfigRef().get(), db.collection("roster").where("classId", "==", RENLUYEN_CLASS_ID).orderBy("order").get()]).then(
+    ([cfgDoc, rosterSnap]) => {
+      const roster10c5 = rosterSnap.docs.map((d) => ({ uid: d.id, fullName: d.data().fullName }));
+
+      if (!cfgDoc.exists) {
+        const defaults = {
+          hocKyHienTai: "",
+          nguoiDuocCham: [],
+          nutNhanh: [
+            { label: "Đi muộn", diem: -1 },
+            { label: "Mất trật tự", diem: -2 },
+            { label: "Phát biểu tốt", diem: 1 },
+          ],
+        };
+        renLuyenConfigRef()
+          .set(defaults)
+          .then(() => {
+            document.getElementById("renluyen-cfg-hocky").value = "";
+            renderRenLuyenGraderTable([], roster10c5);
+            renderRenLuyenGraderSelect([], roster10c5);
+            renderRenLuyenQuickConfigList(defaults.nutNhanh);
+          })
+          .catch((err) => {
+            console.error("Không khởi tạo được config/renluyen:", err);
+            document.getElementById("renluyen-cfg-grader-status").textContent = "Lỗi khi khởi tạo cài đặt: " + err.message;
+          });
+        return;
+      }
+
+      const data = cfgDoc.data() || {};
+      const cfg = {
+        hocKyHienTai: data.hocKyHienTai || "",
+        nguoiDuocCham: Array.isArray(data.nguoiDuocCham) ? data.nguoiDuocCham : [],
+        nutNhanh: Array.isArray(data.nutNhanh) ? data.nutNhanh : [],
+      };
+      document.getElementById("renluyen-cfg-hocky").value = cfg.hocKyHienTai;
+      renderRenLuyenGraderTable(cfg.nguoiDuocCham, roster10c5);
+      renderRenLuyenGraderSelect(cfg.nguoiDuocCham, roster10c5);
+      renderRenLuyenQuickConfigList(cfg.nutNhanh);
+    }
+  ).catch((err) => {
+    console.error("Không tải được Cài đặt điểm rèn luyện:", err);
+  });
+}
+
+function renderRenLuyenGraderTable(graderUids, roster10c5) {
+  const body = document.getElementById("renluyen-cfg-grader-body");
+  const emptyEl = document.getElementById("renluyen-cfg-grader-empty");
+  body.innerHTML = "";
+  const byUid = {};
+  roster10c5.forEach((s) => (byUid[s.uid] = s.fullName));
+  if (!graderUids.length) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  graderUids.forEach((uid) => {
+    const tr = document.createElement("tr");
+    const tdName = document.createElement("td");
+    tdName.textContent = byUid[uid] || "(học sinh không còn trong lớp 10C5)";
+    const tdBtn = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mini-btn";
+    btn.textContent = "Xoá quyền";
+    btn.addEventListener("click", () => removeRenLuyenGrader(uid));
+    tdBtn.appendChild(btn);
+    tr.appendChild(tdName);
+    tr.appendChild(tdBtn);
+    body.appendChild(tr);
+  });
+}
+
+function renderRenLuyenGraderSelect(graderUids, roster10c5) {
+  const select = document.getElementById("renluyen-cfg-add-grader");
+  const remaining = roster10c5.filter((s) => graderUids.indexOf(s.uid) === -1);
+  if (!remaining.length) {
+    select.innerHTML = '<option value="">— Tất cả đã được giao quyền —</option>';
+    return;
+  }
+  select.innerHTML = '<option value="">— Chọn học sinh —</option>';
+  remaining.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.uid;
+    opt.textContent = s.fullName;
+    select.appendChild(opt);
+  });
+}
+
+function addRenLuyenGrader() {
+  const select = document.getElementById("renluyen-cfg-add-grader");
+  const statusEl = document.getElementById("renluyen-cfg-grader-status");
+  const uid = select.value;
+  if (!uid) {
+    statusEl.textContent = "Chọn 1 học sinh trước.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  renLuyenConfigRef()
+    .set({ nguoiDuocCham: firebase.firestore.FieldValue.arrayUnion(uid) }, { merge: true })
+    .then(() => {
+      statusEl.textContent = "✓ Đã thêm.";
+      loadRenLuyenSettingsPanel();
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+}
+
+function removeRenLuyenGrader(uid) {
+  const statusEl = document.getElementById("renluyen-cfg-grader-status");
+  statusEl.textContent = "Đang lưu...";
+  renLuyenConfigRef()
+    .set({ nguoiDuocCham: firebase.firestore.FieldValue.arrayRemove(uid) }, { merge: true })
+    .then(() => {
+      statusEl.textContent = "✓ Đã xoá quyền.";
+      loadRenLuyenSettingsPanel();
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+}
+
+function saveRenLuyenHocKyHienTai() {
+  const statusEl = document.getElementById("renluyen-cfg-hocky-status");
+  const value = document.getElementById("renluyen-cfg-hocky").value.trim();
+  if (!value) {
+    statusEl.textContent = "Nhập mã học kỳ.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  renLuyenConfigRef()
+    .set({ hocKyHienTai: value }, { merge: true })
+    .then(() => {
+      statusEl.textContent = "✓ Đã lưu.";
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+}
+
+function renderRenLuyenQuickConfigList(nutNhanh) {
+  const wrap = document.getElementById("renluyen-cfg-quick-list");
+  wrap.innerHTML = "";
+  (nutNhanh || []).forEach((item, idx) => {
+    const chip = document.createElement("span");
+    chip.style.cssText =
+      "display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--card-border);border-radius:999px;padding:5px 6px 5px 12px;font-size:0.85rem;";
+    const label = document.createElement("span");
+    label.textContent = formatDiemRenLuyen(item.diem) + " " + item.label;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "mini-btn";
+    btn.style.color = "var(--muted)";
+    btn.textContent = "×";
+    btn.addEventListener("click", () => removeRenLuyenQuickButton(idx));
+    chip.appendChild(label);
+    chip.appendChild(btn);
+    wrap.appendChild(chip);
+  });
+}
+
+function addRenLuyenQuickButton() {
+  const statusEl = document.getElementById("renluyen-cfg-quick-status");
+  const label = document.getElementById("renluyen-cfg-quick-label").value.trim();
+  const diemRaw = document.getElementById("renluyen-cfg-quick-diem").value.trim();
+  const diem = Number(diemRaw);
+  if (!label) {
+    statusEl.textContent = "Nhập nhãn.";
+    return;
+  }
+  if (diemRaw === "" || isNaN(diem) || diem === 0) {
+    statusEl.textContent = "Điểm phải là số khác 0.";
+    return;
+  }
+  statusEl.textContent = "Đang lưu...";
+  renLuyenConfigRef()
+    .get()
+    .then((doc) => {
+      const current = doc.exists && Array.isArray(doc.data().nutNhanh) ? doc.data().nutNhanh : [];
+      const nutNhanh = current.concat([{ label, diem }]);
+      return renLuyenConfigRef().set({ nutNhanh }, { merge: true });
+    })
+    .then(() => {
+      statusEl.textContent = "✓ Đã thêm.";
+      document.getElementById("renluyen-cfg-quick-label").value = "";
+      document.getElementById("renluyen-cfg-quick-diem").value = "";
+      loadRenLuyenSettingsPanel();
+    })
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+}
+
+function removeRenLuyenQuickButton(idx) {
+  const statusEl = document.getElementById("renluyen-cfg-quick-status");
+  renLuyenConfigRef()
+    .get()
+    .then((doc) => {
+      const current = doc.exists && Array.isArray(doc.data().nutNhanh) ? doc.data().nutNhanh : [];
+      const nutNhanh = current.slice();
+      nutNhanh.splice(idx, 1);
+      return renLuyenConfigRef().set({ nutNhanh }, { merge: true });
+    })
+    .then(() => loadRenLuyenSettingsPanel())
+    .catch((err) => {
+      statusEl.textContent = "Lỗi: " + err.message;
     });
 }

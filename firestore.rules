@@ -21,6 +21,33 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
     }
 
+    // ---- Điểm rèn luyện (chỉ áp dụng thực tế cho lớp 10C5, classId "10c-lqd") ----
+
+    // Người được giao quyền chấm điểm rèn luyện: uid có trong config/renluyen.nguoiDuocCham.
+    function isRenLuyenGrader() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/config/renluyen) &&
+             request.auth.uid in get(/databases/$(database)/documents/config/renluyen).data.nguoiDuocCham;
+    }
+
+    // Kiểm tra uid có phải học sinh lớp 10C5 (dựa vào roster) không.
+    function is10C5(uid) {
+      return exists(/databases/$(database)/documents/roster/$(uid)) &&
+             get(/databases/$(database)/documents/roster/$(uid)).data.classId == "10c-lqd";
+    }
+
+    // Dữ liệu hợp lệ cho 1 lượt chấm điểm rèn luyện mới.
+    function validRenLuyenEntry() {
+      return request.resource.data.diem is number &&
+             request.resource.data.diem != 0 &&
+             request.resource.data.lyDo is string &&
+             request.resource.data.lyDo.size() > 0 &&
+             request.resource.data.hocKy is string &&
+             request.resource.data.hocKy.size() > 0 &&
+             request.resource.data.nguoiChamUid == request.auth.uid &&
+             request.resource.data.huy == false;
+    }
+
     // Học sinh có quyền viết nhật ký: có roster, chức vụ thuộc journalRoles(),
     // và đúng classId của roster khớp classId truyền vào.
     function canWriteJournalFor(classId) {
@@ -135,6 +162,41 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow read, update: if isAdmin();
       allow delete: if false;
+    }
+
+    // config/renluyen: học kỳ hiện tại + danh sách uid được giao quyền chấm điểm rèn luyện 10C5.
+    // Đọc: bất kỳ ai đã đăng nhập (chỉ chứa 1 chuỗi học kỳ + danh sách uid, không nhạy cảm) —
+    // học sinh cần đọc hocKyHienTai để hiện đúng học kỳ mặc định trên thẻ điểm rèn luyện của mình.
+    // Ghi: chỉ admin (thêm/bớt người chấm, đổi học kỳ hiện tại).
+    match /config/renluyen {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // students/{studentId}/renluyen/{entryId}: từng lượt chấm điểm rèn luyện.
+    // Đọc: chính học sinh đó, hoặc admin. Người được giao quyền chấm KHÔNG đọc được lịch sử
+    // chi tiết của người khác (theo yêu cầu), chỉ tạo mới được lượt chấm cho học sinh 10C5,
+    // và phải tự ghi đúng nguoiChamUid của mình (không giả mạo người khác).
+    // Sửa (huỷ lượt chấm nhầm bằng cách đánh dấu huy=true): chỉ admin. Không ai xoá hẳn được.
+    match /students/{studentId}/renluyen/{entryId} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == studentId || isAdmin());
+      allow create: if isAdmin() ||
+                       (isRenLuyenGrader() && is10C5(studentId) && validRenLuyenEntry());
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // renluyenTong/{studentId}: tổng điểm rèn luyện từng học kỳ, vd {"HK1-2026-2027": 5}.
+    // Tách riêng khỏi students/{uid} (vốn chứa điểm số/nhận xét riêng tư) để người được giao
+    // quyền chấm đọc/ghi được tổng của học sinh 10C5 mà KHÔNG lộ dữ liệu riêng tư khác.
+    // Đọc: chính học sinh đó, admin, hoặc người được giao quyền chấm (cần thấy tổng để chấm).
+    // Ghi: admin (kể cả điều chỉnh khi huỷ lượt chấm), hoặc người được giao quyền chấm cho
+    // đúng học sinh 10C5 (khi họ tạo lượt chấm mới, cùng lúc cộng/trừ vào tổng bằng transaction).
+    match /renluyenTong/{studentId} {
+      allow read: if request.auth != null &&
+                     (request.auth.uid == studentId || isAdmin() || isRenLuyenGrader());
+      allow write: if isAdmin() || (isRenLuyenGrader() && is10C5(studentId));
     }
   }
 }

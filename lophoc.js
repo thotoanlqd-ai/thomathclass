@@ -156,6 +156,14 @@ function loadDashboard(user) {
 
       setupJournalWritePanel();
       loadClassJournal(d.classId);
+      setupRenLuyenGrader(user.uid);
+
+      if (d.classId === RENLUYEN_CLASS_ID) {
+        document.getElementById("renluyen-student-card").hidden = false;
+        loadRenLuyenStudentCard(user.uid);
+      } else {
+        document.getElementById("renluyen-student-card").hidden = true;
+      }
 
       // điểm số
       const scoreBody = document.getElementById("score-body");
@@ -550,10 +558,290 @@ auth.onAuthStateChanged((user) => {
     loadDashboard(user);
   } else {
     viewDashboard.hidden = true;
+    document.getElementById("renluyen-detail-modal").classList.remove("open");
     if (viewRoster.hidden) {
       viewClasses.hidden = false;
     }
   }
 });
+
+// ---------- Chấm điểm rèn luyện (chỉ hiện cho người được giao quyền, lớp 10C5) ----------
+function setupRenLuyenGrader(uid) {
+  const section = document.getElementById("renluyen-grader-section");
+  getRenLuyenConfig().then((cfg) => {
+    const isGrader = cfg.nguoiDuocCham.indexOf(uid) !== -1;
+    section.hidden = !isGrader;
+    if (!isGrader) return;
+    document.getElementById("renluyen-grader-hocky").textContent = cfg.hocKyHienTai || "(chưa đặt)";
+    if (!cfg.hocKyHienTai) {
+      document.getElementById("renluyen-grader-list").innerHTML =
+        '<p class="empty-note">Thầy chưa đặt "Học kỳ hiện tại" trong mục Cài đặt điểm rèn luyện, em báo Thầy nhé.</p>';
+      return;
+    }
+    loadRenLuyenGraderList(cfg, uid);
+  });
+}
+
+function loadRenLuyenGraderList(cfg, myUid) {
+  const listEl = document.getElementById("renluyen-grader-list");
+  listEl.innerHTML = "Đang tải...";
+  db.collection("roster")
+    .where("classId", "==", RENLUYEN_CLASS_ID)
+    .orderBy("order")
+    .get()
+    .then((rosterSnap) => {
+      const students = rosterSnap.docs.map((d) => ({ uid: d.id, fullName: d.data().fullName }));
+      return Promise.all(students.map((s) => db.collection("renluyenTong").doc(s.uid).get())).then((tongDocs) => {
+        listEl.innerHTML = "";
+        if (!students.length) {
+          listEl.innerHTML = '<p class="empty-note">Lớp 10C5 chưa có học sinh nào.</p>';
+          return;
+        }
+        students.forEach((s, idx) => {
+          const tong = tongDocs[idx].exists ? tongDocs[idx].data() || {} : {};
+          const diem = typeof tong[cfg.hocKyHienTai] === "number" ? tong[cfg.hocKyHienTai] : 0;
+          listEl.appendChild(renderRenLuyenGraderRow(s, diem, cfg, myUid));
+        });
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      listEl.innerHTML = '<p class="empty-note">Không tải được danh sách lớp.</p>';
+    });
+}
+
+function renderRenLuyenGraderRow(student, diem, cfg, myUid) {
+  const row = document.createElement("div");
+  row.style.cssText = "border:1px solid var(--card-border);border-radius:10px;padding:12px 14px;margin-bottom:10px;";
+  const diemColor = diem > 0 ? "var(--chalk)" : diem < 0 ? "var(--pen-red)" : "var(--muted)";
+
+  const head = document.createElement("div");
+  head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;";
+  head.innerHTML =
+    "<strong>" +
+    escapeHtml(student.fullName) +
+    '</strong><span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;color:' +
+    diemColor +
+    ';">' +
+    escapeHtml(formatDiemRenLuyen(diem)) +
+    "</span>";
+  row.appendChild(head);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "mini-btn";
+  toggleBtn.style.marginTop = "6px";
+  toggleBtn.textContent = "Chấm điểm";
+  row.appendChild(toggleBtn);
+
+  const form = document.createElement("div");
+  form.hidden = true;
+  form.style.marginTop = "10px";
+
+  const quickWrap = document.createElement("div");
+  quickWrap.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;";
+  form.appendChild(quickWrap);
+
+  const fieldRow = document.createElement("div");
+  fieldRow.className = "admin-row";
+  fieldRow.innerHTML =
+    '<div class="field" style="max-width:110px;"><label>Điểm (+/-)</label><input type="text" placeholder="Vd: -1 hoặc 2" /></div>' +
+    '<div class="field" style="flex:1;min-width:180px;"><label>Lý do</label><input type="text" placeholder="Vd: Đi muộn" /></div>';
+  form.appendChild(fieldRow);
+  const diemInput = fieldRow.children[0].querySelector("input");
+  const lyDoInput = fieldRow.children[1].querySelector("input");
+
+  (cfg.nutNhanh || []).forEach((item) => {
+    const qbtn = document.createElement("button");
+    qbtn.type = "button";
+    qbtn.className = "btn btn-outline btn-small";
+    qbtn.textContent = formatDiemRenLuyen(item.diem) + " " + item.label;
+    qbtn.addEventListener("click", () => {
+      diemInput.value = item.diem;
+      lyDoInput.value = item.label;
+    });
+    quickWrap.appendChild(qbtn);
+  });
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.className = "btn btn-primary btn-small";
+  saveBtn.textContent = "Lưu";
+  form.appendChild(saveBtn);
+
+  const statusEl = document.createElement("p");
+  statusEl.className = "field-error";
+  form.appendChild(statusEl);
+
+  row.appendChild(form);
+
+  toggleBtn.addEventListener("click", () => {
+    form.hidden = !form.hidden;
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const diemRaw = diemInput.value.trim();
+    const diemVal = Number(diemRaw);
+    const lyDo = lyDoInput.value.trim();
+    if (diemRaw === "" || isNaN(diemVal) || diemVal === 0) {
+      statusEl.textContent = "Điểm phải là số khác 0 (vd: -1 hoặc 2).";
+      return;
+    }
+    if (!lyDo) {
+      statusEl.textContent = "Nhập lý do.";
+      return;
+    }
+    statusEl.textContent = "Đang lưu...";
+    saveBtn.disabled = true;
+    themLuotChamRenLuyen(student.uid, diemVal, lyDo, cfg.hocKyHienTai, myUid, myFullName)
+      .then(() => {
+        loadRenLuyenGraderList(cfg, myUid);
+      })
+      .catch((err) => {
+        console.error(err);
+        statusEl.textContent = "Lỗi: " + err.message;
+        saveBtn.disabled = false;
+      });
+  });
+
+  return row;
+}
+
+// ---------- Thẻ "Điểm rèn luyện" nổi bật đầu trang (chỉ học sinh 10C5) ----------
+function loadRenLuyenStudentCard(uid) {
+  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(uid).get()])
+    .then(([cfg, tongDoc]) => {
+      const tong = tongDoc.exists ? tongDoc.data() || {} : {};
+      const hocKy = cfg.hocKyHienTai || "";
+      const diem = hocKy && typeof tong[hocKy] === "number" ? tong[hocKy] : 0;
+      document.getElementById("renluyen-student-hocky").textContent = hocKy || "(chưa có học kỳ)";
+      document.getElementById("renluyen-student-diem-lon").textContent = formatDiemRenLuyen(diem);
+    })
+    .catch((err) => console.error("Không tải được điểm rèn luyện:", err));
+}
+
+document.getElementById("renluyen-student-card").addEventListener("click", openRenLuyenDetailModal);
+document.getElementById("renluyen-student-card").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    openRenLuyenDetailModal();
+  }
+});
+document.getElementById("renluyen-detail-close").addEventListener("click", () => {
+  document.getElementById("renluyen-detail-modal").classList.remove("open");
+});
+document.getElementById("renluyen-detail-hocky-select").addEventListener("change", (e) => {
+  const user = auth.currentUser;
+  if (!user) return;
+  updateRenLuyenDetailDiem(e.target.value);
+  loadRenLuyenDetailHistory(user.uid, e.target.value);
+});
+
+let renLuyenDetailTongCache = {};
+
+function openRenLuyenDetailModal() {
+  const user = auth.currentUser;
+  if (!user || !myClassId || myClassId !== RENLUYEN_CLASS_ID) return;
+  document.getElementById("renluyen-detail-modal").classList.add("open");
+
+  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(user.uid).get()]).then(([cfg, tongDoc]) => {
+    renLuyenDetailTongCache = tongDoc.exists ? tongDoc.data() || {} : {};
+    const select = document.getElementById("renluyen-detail-hocky-select");
+    select.innerHTML = "";
+
+    const options = Object.keys(renLuyenDetailTongCache);
+    if (cfg.hocKyHienTai && options.indexOf(cfg.hocKyHienTai) === -1) options.push(cfg.hocKyHienTai);
+    const sorted = sapXepHocKyGanNhat(options);
+
+    if (!sorted.length) {
+      select.innerHTML = '<option value="">— Chưa có dữ liệu —</option>';
+      updateRenLuyenDetailDiem("");
+      renderRenLuyenDetailHistory([]);
+      return;
+    }
+
+    sorted.forEach((hk) => {
+      const opt = document.createElement("option");
+      opt.value = hk;
+      opt.textContent = hk;
+      select.appendChild(opt);
+    });
+    const defaultHocKy = cfg.hocKyHienTai && sorted.indexOf(cfg.hocKyHienTai) !== -1 ? cfg.hocKyHienTai : sorted[0];
+    select.value = defaultHocKy;
+    updateRenLuyenDetailDiem(defaultHocKy);
+    loadRenLuyenDetailHistory(user.uid, defaultHocKy);
+  });
+}
+
+function updateRenLuyenDetailDiem(hocKy) {
+  const diem = hocKy && typeof renLuyenDetailTongCache[hocKy] === "number" ? renLuyenDetailTongCache[hocKy] : 0;
+  const el = document.getElementById("renluyen-detail-diem-lon");
+  el.textContent = formatDiemRenLuyen(diem);
+  el.style.color = diem > 0 ? "var(--chalk)" : diem < 0 ? "var(--pen-red)" : "var(--muted)";
+}
+
+function loadRenLuyenDetailHistory(uid, hocKy) {
+  if (!hocKy) {
+    renderRenLuyenDetailHistory([]);
+    return;
+  }
+  db.collection("students")
+    .doc(uid)
+    .collection("renluyen")
+    .where("hocKy", "==", hocKy)
+    .orderBy("thoiGian", "desc")
+    .get()
+    .then((snap) => renderRenLuyenDetailHistory(snap.docs))
+    .catch((err) => {
+      console.error("Không tải được lịch sử điểm rèn luyện:", err);
+      renderRenLuyenDetailHistory([]);
+    });
+}
+
+function renderRenLuyenDetailHistory(docs) {
+  const body = document.getElementById("renluyen-detail-body");
+  const emptyEl = document.getElementById("renluyen-detail-empty");
+  body.innerHTML = "";
+  if (!docs.length) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  docs.forEach((doc) => {
+    const d = doc.data();
+    const tr = document.createElement("tr");
+    if (d.huy) tr.style.opacity = "0.55";
+
+    const timeStr = d.thoiGian ? new Date(d.thoiGian.toMillis()).toLocaleString("vi-VN") : "—";
+    const tdTime = document.createElement("td");
+    tdTime.textContent = timeStr;
+
+    const tdDiem = document.createElement("td");
+    tdDiem.textContent = formatDiemRenLuyen(d.diem);
+    tdDiem.style.fontFamily = "'JetBrains Mono', monospace";
+    tdDiem.style.fontWeight = "700";
+    tdDiem.style.color = d.diem > 0 ? "var(--chalk)" : "var(--pen-red)";
+    if (d.huy) tdDiem.style.textDecoration = "line-through";
+
+    const tdLyDo = document.createElement("td");
+    tdLyDo.textContent = d.lyDo || "";
+    if (d.huy) {
+      tdLyDo.style.textDecoration = "line-through";
+      const note = document.createElement("span");
+      note.style.cssText = "text-decoration:none;color:var(--muted);font-size:0.78rem;margin-left:6px;";
+      note.textContent = "(đã huỷ" + (d.huyLyDo ? ": " + d.huyLyDo : "") + ")";
+      tdLyDo.appendChild(note);
+    }
+
+    const tdNguoi = document.createElement("td");
+    tdNguoi.textContent = d.nguoiChamTen || "";
+
+    tr.appendChild(tdTime);
+    tr.appendChild(tdDiem);
+    tr.appendChild(tdLyDo);
+    tr.appendChild(tdNguoi);
+    body.appendChild(tr);
+  });
+}
 
 renderClassGrid();

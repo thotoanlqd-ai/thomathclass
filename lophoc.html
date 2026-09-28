@@ -70,6 +70,15 @@
 
       <!-- ===== VIEW 3: dashboard cá nhân sau khi đăng nhập ===== -->
       <div id="view-dashboard" class="panel" hidden>
+        <div id="renluyen-student-card" hidden role="button" tabindex="0"
+             style="cursor:pointer;background:linear-gradient(135deg, var(--chalk), var(--chalk-light));color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:22px;">
+          <p style="margin:0 0 4px;font-size:0.78rem;letter-spacing:0.06em;text-transform:uppercase;opacity:0.85;">Điểm rèn luyện · <span id="renluyen-student-hocky"></span></p>
+          <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+            <span id="renluyen-student-diem-lon" style="font-size:2.8rem;font-weight:800;line-height:1;"></span>
+            <span style="font-size:0.82rem;opacity:0.85;">Bấm để xem chi tiết →</span>
+          </div>
+        </div>
+
         <div class="dash-header">
           <div class="who">
             <div class="avatar-sm-wrap">
@@ -87,6 +96,12 @@
             </div>
           </div>
           <button class="btn btn-outline btn-small" id="btn-logout">Đăng xuất</button>
+        </div>
+
+        <div class="dash-section" id="renluyen-grader-section" hidden>
+          <h3>Chấm điểm rèn luyện cho lớp 10C5</h3>
+          <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;">Học kỳ hiện tại: <span id="renluyen-grader-hocky" class="mono"></span>. Em chỉ tạo được lượt chấm mới, không xem được lịch sử chi tiết hay huỷ lượt chấm của bạn khác.</p>
+          <div id="renluyen-grader-list"></div>
         </div>
 
         <div class="dash-section" id="tuition-section" hidden>
@@ -392,6 +407,26 @@
   </div>
 </footer>
 
+<!-- MODAL: chi tiết điểm rèn luyện -->
+<div class="modal-overlay" id="renluyen-detail-modal">
+  <div class="modal" style="max-width:560px;">
+    <button class="modal-close" id="renluyen-detail-close" aria-label="Đóng">&times;</button>
+    <p class="eyebrow">Điểm rèn luyện</p>
+    <div class="field" style="max-width:220px;margin-bottom:14px;">
+      <label>Học kỳ</label>
+      <select id="renluyen-detail-hocky-select"></select>
+    </div>
+    <div id="renluyen-detail-diem-lon" style="font-size:2.2rem;font-weight:800;margin-bottom:16px;"></div>
+    <div style="max-height:50vh;overflow-y:auto;">
+      <table class="data-table" id="renluyen-detail-table">
+        <thead><tr><th>Ngày</th><th>Điểm</th><th>Lý do</th><th>Người chấm</th></tr></thead>
+        <tbody id="renluyen-detail-body"></tbody>
+      </table>
+      <p class="empty-note" id="renluyen-detail-empty" hidden>Chưa có lượt chấm nào trong học kỳ này.</p>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: đăng nhập học sinh -->
 <div class="modal-overlay" id="login-modal">
   <div class="modal">
@@ -454,6 +489,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="renluyen.js"></script>
 <script src="script.js"></script>
 <script src="members.js"></script>
 <script src="image-compress.js"></script>

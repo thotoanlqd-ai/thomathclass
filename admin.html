@@ -79,6 +79,7 @@
               <button type="button" class="admin-sidebar-link" data-section="quan-ly-danh-sach">Quản lý danh sách học sinh</button>
               <button type="button" class="admin-sidebar-link" data-section="nhat-ky-lop">Nhật ký lớp học</button>
               <button type="button" class="admin-sidebar-link" data-section="xuat-diem">Xuất điểm và nhận xét</button>
+              <button type="button" class="admin-sidebar-link" data-section="cai-dat-renluyen">Cài đặt điểm rèn luyện</button>
             </div>
             <div class="admin-sidebar-group">
               <p class="admin-sidebar-group-title">Thành viên &amp; thanh toán</p>
@@ -180,6 +181,29 @@
                 </div>
 
                 <div id="student-avatar-list" style="margin-bottom:18px;"></div>
+
+                <!-- Điểm rèn luyện (chỉ hiện với học sinh lớp 10C5) -->
+                <div id="renluyen-panel" hidden style="margin-bottom:24px;padding:18px;border:2px solid var(--pen-red-dark);border-radius:12px;background:var(--paper);">
+                  <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện — <span id="renluyen-hocky-label" class="mono"></span></h3>
+                  <div id="renluyen-diem-lon" style="font-size:2.6rem;font-weight:800;line-height:1.1;margin:6px 0 16px;"></div>
+
+                  <div id="renluyen-quick-buttons" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
+                  <p style="color:var(--muted);font-size:0.78rem;margin:-8px 0 14px;">Bấm nút chấm nhanh để điền sẵn, hoặc tự nhập bên dưới. Sửa/thêm nút chấm nhanh trong mục "Cài đặt điểm rèn luyện".</p>
+
+                  <div class="admin-row">
+                    <div class="field" style="max-width:110px;"><label>Điểm (+/-)</label><input type="text" id="renluyen-diem-input" placeholder="Vd: -1 hoặc 2" /></div>
+                    <div class="field" style="flex:1;min-width:200px;"><label>Lý do (bắt buộc)</label><input type="text" id="renluyen-lydo-input" placeholder="Vd: Đi muộn" /></div>
+                    <button class="btn btn-primary btn-small" id="btn-renluyen-save">Lưu</button>
+                  </div>
+                  <p class="field-error" id="renluyen-status"></p>
+
+                  <h4 style="margin:20px 0 10px;font-size:0.9rem;">Lịch sử chấm học kỳ này</h4>
+                  <table class="data-table" id="renluyen-history-table">
+                    <thead><tr><th>Thời gian</th><th>Điểm</th><th>Lý do</th><th>Người chấm</th><th></th></tr></thead>
+                    <tbody id="renluyen-history-body"></tbody>
+                  </table>
+                  <p class="empty-note" id="renluyen-history-empty" hidden>Chưa có lượt chấm nào trong học kỳ này.</p>
+                </div>
 
                 <div id="student-editor" hidden>
                   <h4 style="margin:18px 0 10px;font-size:0.92rem;">Thêm điểm số</h4>
@@ -308,6 +332,44 @@
                   <button class="btn btn-primary btn-small" id="btn-export-excel">Xuất ra Excel</button>
                 </div>
                 <p class="field-error" id="export-status" style="color:var(--chalk);"></p>
+              </div>
+            </div>
+
+            <!-- ===== HỌC SINH & LỚP HỌC — Cài đặt điểm rèn luyện ===== -->
+            <div class="admin-section" data-section="cai-dat-renluyen" hidden>
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">⚙️ Cài đặt điểm rèn luyện (lớp 10C5)</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 18px;">Chỉ áp dụng cho lớp 10C5 LQĐ. Điểm ban đầu mỗi học kỳ của mọi học sinh là 0.</p>
+
+                <h4 style="margin:0 0 10px;font-size:0.92rem;">Học kỳ hiện tại</h4>
+                <div class="admin-row">
+                  <div class="field" style="max-width:240px;"><label>Mã học kỳ (vd: HK1-2026-2027)</label><input type="text" id="renluyen-cfg-hocky" placeholder="HK1-2026-2027" /></div>
+                  <button class="btn btn-outline btn-small" id="btn-renluyen-cfg-hocky-save">Lưu học kỳ hiện tại</button>
+                </div>
+                <p class="field-error" id="renluyen-cfg-hocky-status"></p>
+
+                <h4 style="margin:26px 0 10px;font-size:0.92rem;">Người được giao quyền chấm điểm</h4>
+                <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Người trong danh sách này, khi đăng nhập vào Khu vực lớp học, sẽ thấy thêm màn hình chấm điểm rèn luyện đơn giản cho cả lớp.</p>
+                <div class="admin-row">
+                  <div class="field"><label>Chọn học sinh 10C5</label><select id="renluyen-cfg-add-grader"></select></div>
+                  <button class="btn btn-primary btn-small" id="btn-renluyen-cfg-add-grader">+ Thêm</button>
+                </div>
+                <table class="data-table" id="renluyen-cfg-grader-table">
+                  <thead><tr><th>Họ tên</th><th></th></tr></thead>
+                  <tbody id="renluyen-cfg-grader-body"></tbody>
+                </table>
+                <p class="empty-note" id="renluyen-cfg-grader-empty" hidden>Chưa giao quyền chấm điểm cho ai.</p>
+                <p class="field-error" id="renluyen-cfg-grader-status"></p>
+
+                <h4 style="margin:26px 0 10px;font-size:0.92rem;">Nút chấm nhanh</h4>
+                <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Hiện ở khu vực chấm điểm (trang Admin lẫn màn hình chấm điểm của người được giao quyền).</p>
+                <div class="admin-row">
+                  <div class="field" style="max-width:220px;"><label>Nhãn</label><input type="text" id="renluyen-cfg-quick-label" placeholder="Vd: Đi muộn" /></div>
+                  <div class="field" style="max-width:110px;"><label>Điểm</label><input type="text" id="renluyen-cfg-quick-diem" placeholder="Vd: -1" /></div>
+                  <button class="btn btn-primary btn-small" id="btn-renluyen-cfg-quick-add">+ Thêm nút</button>
+                </div>
+                <div id="renluyen-cfg-quick-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+                <p class="field-error" id="renluyen-cfg-quick-status"></p>
               </div>
             </div>
 
@@ -486,6 +548,7 @@
 <script src="https://www.gstatic.com/firebasejs/12.12.1/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="image-compress.js"></script>
+<script src="renluyen.js"></script>
 <script src="admin.js"></script>
 <script>
   if ("serviceWorker" in navigator) {
