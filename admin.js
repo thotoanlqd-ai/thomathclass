@@ -2069,23 +2069,24 @@ function loadRenLuyenAdminPanel(uid) {
 
     Promise.all([
       db.collection("renluyenTong").doc(uid).get(),
-      db
-        .collection("students")
-        .doc(uid)
-        .collection("renluyen")
-        .where("hocKy", "==", cfg.hocKyHienTai)
-        .orderBy("thoiGian", "desc")
-        .get(),
-    ]).then(([tongDoc, historySnap]) => {
-      if (uid !== currentStudentUid) return;
-      const tong = tongDoc.exists ? tongDoc.data() || {} : {};
-      const diemHienTai = typeof tong[cfg.hocKyHienTai] === "number" ? tong[cfg.hocKyHienTai] : 0;
-      const diemEl = document.getElementById("renluyen-diem-lon");
-      diemEl.textContent = formatDiemRenLuyen(diemHienTai);
-      diemEl.style.color = diemHienTai > 0 ? "var(--chalk)" : diemHienTai < 0 ? "var(--pen-red)" : "var(--muted)";
+      db.collection("students").doc(uid).collection("renluyen").where("hocKy", "==", cfg.hocKyHienTai).get(),
+    ])
+      .then(([tongDoc, historySnap]) => {
+        if (uid !== currentStudentUid) return;
+        const tong = tongDoc.exists ? tongDoc.data() || {} : {};
+        const diemHienTai = typeof tong[cfg.hocKyHienTai] === "number" ? tong[cfg.hocKyHienTai] : 0;
+        const diemEl = document.getElementById("renluyen-diem-lon");
+        diemEl.textContent = formatDiemRenLuyen(diemHienTai);
+        diemEl.style.color = diemHienTai > 0 ? "var(--chalk)" : diemHienTai < 0 ? "var(--pen-red)" : "var(--muted)";
 
-      renderRenLuyenHistory(uid, historySnap.docs, true);
-    });
+        renderRenLuyenHistory(uid, sapXepLuotChamMoiNhat(historySnap.docs), true);
+      })
+      .catch((err) => {
+        console.error("Không tải được điểm rèn luyện:", err);
+        if (uid !== currentStudentUid) return;
+        document.getElementById("renluyen-diem-lon").textContent = "?";
+        statusEl.textContent = "Không tải được điểm rèn luyện: " + err.message;
+      });
   });
 }
 

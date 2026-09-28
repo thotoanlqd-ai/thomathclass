@@ -744,33 +744,42 @@ function openRenLuyenDetailModal() {
   if (!user || !myClassId || myClassId !== RENLUYEN_CLASS_ID) return;
   document.getElementById("renluyen-detail-modal").classList.add("open");
 
-  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(user.uid).get()]).then(([cfg, tongDoc]) => {
-    renLuyenDetailTongCache = tongDoc.exists ? tongDoc.data() || {} : {};
-    const select = document.getElementById("renluyen-detail-hocky-select");
-    select.innerHTML = "";
+  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(user.uid).get()])
+    .then(([cfg, tongDoc]) => {
+      renLuyenDetailTongCache = tongDoc.exists ? tongDoc.data() || {} : {};
+      const select = document.getElementById("renluyen-detail-hocky-select");
+      select.innerHTML = "";
 
-    const options = Object.keys(renLuyenDetailTongCache);
-    if (cfg.hocKyHienTai && options.indexOf(cfg.hocKyHienTai) === -1) options.push(cfg.hocKyHienTai);
-    const sorted = sapXepHocKyGanNhat(options);
+      const options = Object.keys(renLuyenDetailTongCache);
+      if (cfg.hocKyHienTai && options.indexOf(cfg.hocKyHienTai) === -1) options.push(cfg.hocKyHienTai);
+      const sorted = sapXepHocKyGanNhat(options);
 
-    if (!sorted.length) {
-      select.innerHTML = '<option value="">— Chưa có dữ liệu —</option>';
+      if (!sorted.length) {
+        select.innerHTML = '<option value="">— Chưa có dữ liệu —</option>';
+        updateRenLuyenDetailDiem("");
+        renderRenLuyenDetailHistory([]);
+        return;
+      }
+
+      sorted.forEach((hk) => {
+        const opt = document.createElement("option");
+        opt.value = hk;
+        opt.textContent = hk;
+        select.appendChild(opt);
+      });
+      const defaultHocKy = cfg.hocKyHienTai && sorted.indexOf(cfg.hocKyHienTai) !== -1 ? cfg.hocKyHienTai : sorted[0];
+      select.value = defaultHocKy;
+      updateRenLuyenDetailDiem(defaultHocKy);
+      loadRenLuyenDetailHistory(user.uid, defaultHocKy);
+    })
+    .catch((err) => {
+      console.error("Không tải được chi tiết điểm rèn luyện:", err);
+      document.getElementById("renluyen-detail-hocky-select").innerHTML = '<option value="">— Lỗi tải dữ liệu —</option>';
       updateRenLuyenDetailDiem("");
       renderRenLuyenDetailHistory([]);
-      return;
-    }
-
-    sorted.forEach((hk) => {
-      const opt = document.createElement("option");
-      opt.value = hk;
-      opt.textContent = hk;
-      select.appendChild(opt);
+      document.getElementById("renluyen-detail-empty").textContent = "Có lỗi khi tải dữ liệu: " + err.message;
+      document.getElementById("renluyen-detail-empty").hidden = false;
     });
-    const defaultHocKy = cfg.hocKyHienTai && sorted.indexOf(cfg.hocKyHienTai) !== -1 ? cfg.hocKyHienTai : sorted[0];
-    select.value = defaultHocKy;
-    updateRenLuyenDetailDiem(defaultHocKy);
-    loadRenLuyenDetailHistory(user.uid, defaultHocKy);
-  });
 }
 
 function updateRenLuyenDetailDiem(hocKy) {
@@ -789,9 +798,8 @@ function loadRenLuyenDetailHistory(uid, hocKy) {
     .doc(uid)
     .collection("renluyen")
     .where("hocKy", "==", hocKy)
-    .orderBy("thoiGian", "desc")
     .get()
-    .then((snap) => renderRenLuyenDetailHistory(snap.docs))
+    .then((snap) => renderRenLuyenDetailHistory(sapXepLuotChamMoiNhat(snap.docs)))
     .catch((err) => {
       console.error("Không tải được lịch sử điểm rèn luyện:", err);
       renderRenLuyenDetailHistory([]);

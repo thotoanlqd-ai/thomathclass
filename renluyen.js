@@ -36,6 +36,18 @@ function capHocKyTrongNam(hocKy) {
   return { hk1: "HK1-" + m[1] + "-" + m[2], hk2: "HK2-" + m[1] + "-" + m[2] };
 }
 
+// Sắp xếp danh sách QueryDocumentSnapshot của "renluyen" theo thoiGian MỚI NHẤT TRƯỚC.
+// Sắp xếp ở phía client (KHÔNG dùng orderBy trên Firestore) để khỏi cần tạo composite
+// index cho collection "renluyen" (kết hợp where("hocKy",...) + orderBy("thoiGian",...)
+// đòi hỏi composite index chưa từng được tạo, khiến truy vấn lỗi âm thầm).
+function sapXepLuotChamMoiNhat(docs) {
+  return docs.slice().sort((a, b) => {
+    const ta = a.data().thoiGian ? a.data().thoiGian.toMillis() : 0;
+    const tb = b.data().thoiGian ? b.data().thoiGian.toMillis() : 0;
+    return tb - ta;
+  });
+}
+
 // Sắp xếp danh sách mã học kỳ theo thứ tự MỚI NHẤT TRƯỚC, dựa vào định dạng
 // "HK{số học kỳ}-{năm bắt đầu}-{năm kết thúc}" (vd "HK1-2026-2027", "HK2-2026-2027").
 // Mã không đúng định dạng bị xếp xuống cuối (không làm hỏng danh sách).
