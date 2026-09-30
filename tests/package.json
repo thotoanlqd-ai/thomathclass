@@ -1,0 +1,12 @@
+{
+  "name": "thomathclass-tests",
+  "private": true,
+  "description": "Test firestore.rules bằng Firebase Emulator (cần Java). Chạy: npm test",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-thomathclass \"node --test rules.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.14.1"
+  }
+}

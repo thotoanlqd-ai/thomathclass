@@ -198,5 +198,20 @@ service cloud.firestore {
                      (request.auth.uid == studentId || isAdmin() || isRenLuyenGrader());
       allow write: if isAdmin() || (isRenLuyenGrader() && is10C5(studentId));
     }
+
+    // leaderboard/10C5_<học kỳ>: bảng xếp hạng công khai TRONG LỚP — chỉ chứa
+    // {hocKy, siSo, top:[{hang,ten,diem}]} (mọi em hạng <= 10, KHÔNG có lý do, KHÔNG có uid).
+    // Đọc: học sinh 10C5 đã đăng nhập, hoặc admin. Ghi: chỉ Cloud Function (Admin SDK bỏ qua rules).
+    match /leaderboard/{docId} {
+      allow read: if request.auth != null && (isAdmin() || is10C5(request.auth.uid));
+      allow write: if false;
+    }
+
+    // renluyenHang/{studentId}: hạng + điểm học kỳ hiện tại của RIÊNG từng học sinh
+    // ({hocKy, hang, diem, siSo}). Đọc: chính học sinh đó hoặc admin. Ghi: chỉ Cloud Function.
+    match /renluyenHang/{studentId} {
+      allow read: if request.auth != null && (request.auth.uid == studentId || isAdmin());
+      allow write: if false;
+    }
   }
 }

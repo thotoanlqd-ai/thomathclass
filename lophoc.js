@@ -161,8 +161,10 @@ function loadDashboard(user) {
       if (d.classId === RENLUYEN_CLASS_ID) {
         document.getElementById("renluyen-student-card").hidden = false;
         loadRenLuyenStudentCard(user.uid);
+        loadRenLuyenLeaderboard(user.uid, d.fullName);
       } else {
         document.getElementById("renluyen-student-card").hidden = true;
+        document.getElementById("renluyen-leaderboard").hidden = true;
       }
 
       // điểm số
@@ -853,3 +855,71 @@ function renderRenLuyenDetailHistory(docs) {
 }
 
 renderClassGrid();
+
+// ---------- Bảng xếp hạng lớp 10C5 (chỉ học sinh 10C5) ----------
+// Chỉ đọc 2 tài liệu do Cloud Function ghi: leaderboard/10C5_<học kỳ> (top 10, không lý do) và
+// renluyenHang/<uid> (hạng của riêng em). KHÔNG đọc điểm của bạn khác.
+function loadRenLuyenLeaderboard(uid, myName) {
+  const box = document.getElementById("renluyen-leaderboard");
+  const meEl = document.getElementById("renluyen-lb-me");
+  const body = document.getElementById("renluyen-lb-body");
+  const emptyEl = document.getElementById("renluyen-lb-empty");
+  const table = document.getElementById("renluyen-lb-table");
+  box.hidden = false;
+  body.innerHTML = "";
+  meEl.textContent = "";
+  emptyEl.hidden = true;
+  table.hidden = false;
+
+  const showEmpty = (msg) => {
+    table.hidden = true;
+    emptyEl.textContent = msg;
+    emptyEl.hidden = false;
+  };
+
+  getRenLuyenConfig()
+    .then((cfg) => {
+      if (!cfg.hocKyHienTai) {
+        showEmpty("Chưa có học kỳ hiện tại nên chưa có bảng xếp hạng.");
+        return;
+      }
+      return Promise.all([
+        db.collection("leaderboard").doc("10C5_" + cfg.hocKyHienTai).get(),
+        db.collection("renluyenHang").doc(uid).get(),
+      ]).then(([lbDoc, hangDoc]) => {
+        if (!lbDoc.exists) {
+          showEmpty("Bảng xếp hạng chưa có dữ liệu.");
+          return;
+        }
+        const lb = lbDoc.data();
+        const hang = hangDoc.exists && hangDoc.data().hocKy === cfg.hocKyHienTai ? hangDoc.data() : null;
+        const siSo = lb.siSo || (hang && hang.siSo) || "?";
+        if (hang) meEl.textContent = "Bạn đang xếp thứ " + hang.hang + "/" + siSo;
+
+        (lb.top || []).forEach((r) => {
+          const laToi = !!hang && r.hang === hang.hang && r.ten === myName;
+          const tr = document.createElement("tr");
+          if (laToi) {
+            tr.style.background = "var(--paper)";
+            tr.style.fontWeight = "800";
+            tr.style.outline = "2px solid var(--chalk)";
+          }
+          [String(r.hang), r.ten + (laToi ? " (bạn)" : ""), formatDiemRenLuyen(r.diem)].forEach((text, i) => {
+            const td = document.createElement("td");
+            td.textContent = text;
+            if (i === 2) {
+              td.style.textAlign = "right";
+              td.style.fontFamily = "'JetBrains Mono', monospace";
+            }
+            tr.appendChild(td);
+          });
+          body.appendChild(tr);
+        });
+        if (!(lb.top || []).length) showEmpty("Bảng xếp hạng chưa có dữ liệu.");
+      });
+    })
+    .catch((err) => {
+      console.error("Không tải được bảng xếp hạng:", err);
+      showEmpty("Không tải được bảng xếp hạng lúc này.");
+    });
+}

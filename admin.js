@@ -173,6 +173,8 @@ function populateClassSelects() {
       sel.appendChild(opt);
     });
   });
+  // Mặc định mở thẳng lớp 10C5 (đổi lớp khác bằng ô "Chọn lớp")
+  document.getElementById("pick-class").value = RENLUYEN_CLASS_ID;
   loadStudentPicker(document.getElementById("pick-class").value);
   renderBulkClassGrid();
   loadDeleteList();
@@ -230,6 +232,7 @@ function loadStudentPicker(classId) {
   pickStudent.innerHTML = '<option value="">— Đang tải... —</option>';
   document.getElementById("student-editor").hidden = true;
   document.getElementById("renluyen-panel").hidden = true;
+  document.getElementById("renluyen-bang-tong").hidden = true;
 
   db.collection("roster")
     .where("classId", "==", classId)
@@ -247,6 +250,7 @@ function loadStudentPicker(classId) {
         pickStudent.appendChild(opt);
       });
       renderStudentAvatarList(students);
+      if (classId === RENLUYEN_CLASS_ID && !pickStudent.value) loadRenLuyenBangTong(students);
     });
 }
 
@@ -256,8 +260,10 @@ document.getElementById("pick-student").addEventListener("change", (e) => {
   if (!uid) {
     document.getElementById("student-editor").hidden = true;
     document.getElementById("renluyen-panel").hidden = true;
+    if (currentStudentClassId === RENLUYEN_CLASS_ID) loadRenLuyenBangTong(renLuyenBtStudents);
     return;
   }
+  document.getElementById("renluyen-bang-tong").hidden = true;
   currentStudentUid = uid;
   loadStudentEditor(uid);
 });
@@ -2412,3 +2418,128 @@ function removeRenLuyenQuickButton(idx) {
       statusEl.textContent = "Lỗi: " + err.message;
     });
 }
+
+// ==========================================================
+// BẢNG TỔNG HỢP ĐIỂM RÈN LUYỆN LỚP 10C5 (hiện khi chưa chọn học sinh nào)
+// ==========================================================
+let renLuyenBtStudents = [];
+let renLuyenBtToken = 0; // bỏ kết quả tải cũ nếu admin đã đổi lớp/chọn học sinh trong lúc chờ
+
+// Mốc 00:00 thứ Hai gần nhất (giờ Asia/Ho_Chi_Minh, UTC+7, không có giờ mùa hè) — trả về mili-giây UTC.
+function dauTuanVNMillis(now) {
+  const VN_OFFSET = 7 * 3600 * 1000;
+  const vn = new Date((now === undefined ? Date.now() : now) + VN_OFFSET); // đọc bằng getUTC* sẽ ra giờ VN
+  const dayFromMonday = (vn.getUTCDay() + 6) % 7; // T2=0 ... CN=6
+  const midnightVN = Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate());
+  return midnightVN - dayFromMonday * 86400000 - VN_OFFSET;
+}
+
+// Xếp hạng kiểu 1,2,2,4: rows đã có .tong, trả về mảng sắp xếp giảm dần kèm .hang
+function xepHangRenLuyenClient(rows) {
+  const sorted = rows.slice().sort((a, b) => b.tong - a.tong || a.fullName.localeCompare(b.fullName, "vi"));
+  let hang = 0;
+  sorted.forEach((r, i) => {
+    if (i === 0 || r.tong !== sorted[i - 1].tong) hang = i + 1;
+    r.hang = hang;
+  });
+  return sorted;
+}
+
+function loadRenLuyenBangTong(students) {
+  renLuyenBtStudents = students || [];
+  const wrap = document.getElementById("renluyen-bang-tong");
+  const body = document.getElementById("renluyen-bt-body");
+  const emptyEl = document.getElementById("renluyen-bt-empty");
+  const token = ++renLuyenBtToken;
+  wrap.hidden = false;
+  body.innerHTML = "";
+  emptyEl.hidden = true;
+  document.getElementById("renluyen-bt-hocky").textContent = "";
+
+  getRenLuyenConfig().then((cfg) => {
+    if (token !== renLuyenBtToken) return;
+    document.getElementById("renluyen-bt-hocky").textContent = cfg.hocKyHienTai || "";
+    if (!cfg.hocKyHienTai) {
+      emptyEl.textContent = 'Chưa đặt "Học kỳ hiện tại" — vào mục Cài đặt điểm rèn luyện để đặt.';
+      emptyEl.hidden = false;
+      return;
+    }
+    if (!renLuyenBtStudents.length) {
+      emptyEl.textContent = "Lớp này chưa có học sinh nào.";
+      emptyEl.hidden = false;
+      return;
+    }
+    emptyEl.textContent = "Đang tải...";
+    emptyEl.hidden = false;
+    const tuanBatDau = dauTuanVNMillis();
+    // Tổng = cộng các lượt chấm CHƯA huỷ của học kỳ hiện tại (cùng cách Cloud Function tính bảng xếp hạng)
+    Promise.all(
+      renLuyenBtStudents.map((s) =>
+        db
+          .collection("students")
+          .doc(s.uid)
+          .collection("renluyen")
+          .where("hocKy", "==", cfg.hocKyHienTai)
+          .get()
+          .then((snap) => {
+            let tong = 0;
+            let tuan = 0;
+            snap.forEach((doc) => {
+              const d = doc.data();
+              if (d.huy === true || typeof d.diem !== "number") return;
+              tong += d.diem;
+              if (d.thoiGian && d.thoiGian.toMillis() >= tuanBatDau) tuan += d.diem;
+            });
+            return { uid: s.uid, fullName: s.fullName || "", tong, tuan };
+          })
+      )
+    )
+      .then((rows) => {
+        if (token !== renLuyenBtToken) return;
+        emptyEl.hidden = true;
+        renderRenLuyenBangTong(xepHangRenLuyenClient(rows));
+      })
+      .catch((err) => {
+        console.error("Không tải được bảng điểm rèn luyện:", err);
+        if (token !== renLuyenBtToken) return;
+        emptyEl.textContent = "Không tải được bảng tổng hợp: " + err.message;
+        emptyEl.hidden = false;
+      });
+  });
+}
+
+function renderRenLuyenBangTong(rows) {
+  const body = document.getElementById("renluyen-bt-body");
+  body.innerHTML = "";
+  const mau = (n) => (n > 0 ? "var(--chalk)" : n < 0 ? "var(--pen-red)" : "var(--muted)");
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.style.cursor = "pointer";
+    const mono = "'JetBrains Mono', monospace";
+    const cells = [
+      [String(r.hang), {}],
+      [r.fullName, {}],
+      [formatDiemRenLuyen(r.tong), { textAlign: "right", fontWeight: "700", fontFamily: mono, color: mau(r.tong) }],
+      [formatDiemRenLuyen(r.tuan), { textAlign: "right", fontFamily: mono, color: mau(r.tuan) }],
+    ];
+    cells.forEach(([text, style]) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      Object.assign(td.style, style);
+      tr.appendChild(td);
+    });
+    tr.addEventListener("click", () => {
+      const sel = document.getElementById("pick-student");
+      sel.value = r.uid;
+      sel.dispatchEvent(new Event("change"));
+      sel.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    body.appendChild(tr);
+  });
+}
+
+document.getElementById("btn-renluyen-back-bt").addEventListener("click", () => {
+  const sel = document.getElementById("pick-student");
+  sel.value = "";
+  sel.dispatchEvent(new Event("change"));
+});

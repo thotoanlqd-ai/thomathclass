@@ -79,6 +79,18 @@
           </div>
         </div>
 
+        <div id="renluyen-leaderboard" hidden style="border:1px solid var(--card-border);border-radius:14px;padding:16px 18px;margin-bottom:22px;">
+          <h3 style="margin:0 0 4px;font-size:1.05rem;">🏆 Bảng xếp hạng lớp 10C5</h3>
+          <p id="renluyen-lb-me" style="margin:0 0 12px;font-weight:700;color:var(--chalk);"></p>
+          <div style="overflow-x:auto;">
+            <table class="data-table" id="renluyen-lb-table" style="margin-top:0;">
+              <thead><tr><th style="width:56px;">Hạng</th><th>Họ tên</th><th style="text-align:right;">Điểm</th></tr></thead>
+              <tbody id="renluyen-lb-body"></tbody>
+            </table>
+          </div>
+          <p class="empty-note" id="renluyen-lb-empty" hidden>Bảng xếp hạng chưa có dữ liệu.</p>
+        </div>
+
         <div class="dash-header">
           <div class="who">
             <div class="avatar-sm-wrap">

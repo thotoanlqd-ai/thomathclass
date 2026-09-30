@@ -75,8 +75,8 @@
           <aside class="admin-sidebar" id="admin-sidebar">
             <div class="admin-sidebar-group">
               <p class="admin-sidebar-group-title">Học sinh &amp; lớp học</p>
-              <button type="button" class="admin-sidebar-link active" data-section="them-hoc-sinh">Thêm học sinh</button>
-              <button type="button" class="admin-sidebar-link" data-section="quan-ly-danh-sach">Quản lý danh sách học sinh</button>
+              <button type="button" class="admin-sidebar-link" data-section="them-hoc-sinh">Thêm học sinh</button>
+              <button type="button" class="admin-sidebar-link active" data-section="quan-ly-danh-sach">Quản lý danh sách học sinh</button>
               <button type="button" class="admin-sidebar-link" data-section="nhat-ky-lop">Nhật ký lớp học</button>
               <button type="button" class="admin-sidebar-link" data-section="xuat-diem">Xuất điểm và nhận xét</button>
               <button type="button" class="admin-sidebar-link" data-section="cai-dat-renluyen">Cài đặt điểm rèn luyện</button>
@@ -99,7 +99,7 @@
           <div class="admin-content">
 
             <!-- ===== HỌC SINH & LỚP HỌC — Thêm học sinh ===== -->
-            <div class="admin-section" data-section="them-hoc-sinh">
+            <div class="admin-section" data-section="them-hoc-sinh" hidden>
 
               <!-- Thêm 1 học sinh -->
               <div class="panel">
@@ -164,7 +164,7 @@
             </div>
 
             <!-- ===== HỌC SINH & LỚP HỌC — Quản lý danh sách học sinh ===== -->
-            <div class="admin-section" data-section="quan-ly-danh-sach" hidden>
+            <div class="admin-section" data-section="quan-ly-danh-sach">
 
               <!-- Nhập điểm / nhận xét -->
               <div class="panel">
@@ -182,8 +182,22 @@
 
                 <div id="student-avatar-list" style="margin-bottom:18px;"></div>
 
+                <!-- Bảng tổng hợp điểm rèn luyện lớp 10C5 (hiện khi chưa chọn học sinh nào) -->
+                <div id="renluyen-bang-tong" hidden style="margin-bottom:24px;">
+                  <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện lớp 10C5 — <span id="renluyen-bt-hocky" class="mono"></span></h3>
+                  <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Bấm vào một dòng để mở chi tiết và chấm điểm học sinh đó. "Thay đổi trong tuần" tính từ 00:00 thứ Hai (giờ Việt Nam).</p>
+                  <div style="overflow-x:auto;">
+                    <table class="data-table" id="renluyen-bt-table">
+                      <thead><tr><th style="width:60px;">Hạng</th><th>Họ tên</th><th style="text-align:right;">Điểm rèn luyện</th><th style="text-align:right;">Thay đổi trong tuần</th></tr></thead>
+                      <tbody id="renluyen-bt-body"></tbody>
+                    </table>
+                  </div>
+                  <p class="empty-note" id="renluyen-bt-empty" hidden></p>
+                </div>
+
                 <!-- Điểm rèn luyện (chỉ hiện với học sinh lớp 10C5) -->
                 <div id="renluyen-panel" hidden style="margin-bottom:24px;padding:18px;border:2px solid var(--pen-red-dark);border-radius:12px;background:var(--paper);">
+                  <button type="button" class="back-link" id="btn-renluyen-back-bt" style="margin-bottom:8px;">← Bảng tổng hợp lớp 10C5</button>
                   <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện — <span id="renluyen-hocky-label" class="mono"></span></h3>
                   <div id="renluyen-diem-lon" style="font-size:2.6rem;font-weight:800;line-height:1.1;margin:6px 0 16px;"></div>
 

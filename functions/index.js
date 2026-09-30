@@ -1,7 +1,7 @@
 // =========================================================
 // ThoMathClass — Cloud Functions
 // =========================================================
-// 4 functions:
+// 6 functions:
 //   claimProduct          (callable)  — khách bấm "Mua ngay": nếu sản phẩm miễn phí
 //                          thì cấp quyền ngay, nếu có giá thì tạo link thanh toán payOS
 //   payosWebhook           (HTTP)      — payOS gọi vào đây khi có người chuyển khoản
@@ -10,6 +10,9 @@
 //                          mới cho học sinh 3 lớp Thầy Thọ vs 2k9/2k10/2k11
 //   createTuitionPayment   (callable)  — phụ huynh bấm "Đóng học phí": tạo/tái dùng
 //                          link thanh toán payOS cho 1 khoản học phí
+//   capNhatXepHangRenLuyen      (firestore) — mỗi khi có lượt chấm điểm rèn luyện được thêm/sửa/xoá,
+//   capNhatXepHangKhiDoiHocKy   (firestore)   hoặc khi đổi học kỳ hiện tại: tính lại bảng xếp hạng lớp 10C5
+//                          -> leaderboard/10C5_<học kỳ> (top 10 công khai) + renluyenHang/{uid} (hạng riêng)
 //
 // Trước khi deploy cần khai báo 3 secret lấy từ trang quản trị payOS:
 //   firebase functions:secrets:set PAYOS_CLIENT_ID
@@ -20,10 +23,12 @@
 
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const PayOS = require("@payos/node");
+const { tongDiem, xepHang, layTop } = require("./renluyen-rank");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -420,5 +425,79 @@ exports.payosWebhook = onRequest(
       // vẫn trả 200 để payOS không lặp lại gửi vô hạn khi lỗi nằm ở phía mình
       res.status(200).send("ok");
     }
+  }
+);
+
+// ---------------------------------------------------------
+// Bảng xếp hạng điểm rèn luyện lớp 10C5
+// ---------------------------------------------------------
+// Học sinh KHÔNG được đọc điểm của nhau, nên bảng xếp hạng được Cloud Function tính bằng Admin SDK
+// rồi ghi ra 2 nơi mà firestore.rules cho học sinh 10C5 đọc:
+//   leaderboard/10C5_<học kỳ>  : { hocKy, siSo, top:[{hang,ten,diem}], capNhatLuc }  (mọi em hạng <= 10)
+//   renluyenHang/{uid}         : { hocKy, hang, diem, siSo, capNhatLuc }            (chỉ chủ + admin đọc)
+// PHẢI khớp RENLUYEN_CLASS_ID trong renluyen.js / is10C5() trong firestore.rules.
+const RENLUYEN_CLASS_ID = "10c-lqd";
+
+async function rebuildRenLuyenLeaderboard() {
+  const cfgSnap = await db.collection("config").doc("renluyen").get();
+  const hocKy = cfgSnap.exists ? cfgSnap.data().hocKyHienTai : "";
+  if (!hocKy || typeof hocKy !== "string") {
+    logger.info("rebuildRenLuyenLeaderboard: chưa đặt học kỳ hiện tại, bỏ qua");
+    return;
+  }
+
+  const rosterSnap = await db.collection("roster").where("classId", "==", RENLUYEN_CLASS_ID).get();
+  const students = await Promise.all(
+    rosterSnap.docs.map(async (r) => {
+      const entries = await db
+        .collection("students")
+        .doc(r.id)
+        .collection("renluyen")
+        .where("hocKy", "==", hocKy)
+        .get();
+      return {
+        uid: r.id,
+        ten: r.data().fullName || "",
+        tong: tongDiem(entries.docs.map((e) => e.data()), hocKy),
+      };
+    })
+  );
+
+  const ranked = xepHang(students);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const batch = db.batch();
+  batch.set(db.collection("leaderboard").doc(`10C5_${hocKy}`), {
+    hocKy,
+    siSo: ranked.length,
+    top: layTop(ranked),
+    capNhatLuc: now,
+  });
+  ranked.forEach((r) => {
+    batch.set(db.collection("renluyenHang").doc(r.uid), {
+      hocKy,
+      hang: r.hang,
+      diem: r.tong,
+      siSo: ranked.length,
+      capNhatLuc: now,
+    });
+  });
+  await batch.commit();
+  logger.info(`rebuildRenLuyenLeaderboard: ${hocKy} — đã xếp hạng ${ranked.length} học sinh`);
+}
+
+exports.capNhatXepHangRenLuyen = onDocumentWritten(
+  { region: REGION, document: "students/{studentId}/renluyen/{entryId}" },
+  async () => {
+    await rebuildRenLuyenLeaderboard();
+  }
+);
+
+exports.capNhatXepHangKhiDoiHocKy = onDocumentWritten(
+  { region: REGION, document: "config/renluyen" },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data().hocKyHienTai : null;
+    const after = event.data.after.exists ? event.data.after.data().hocKyHienTai : null;
+    if (before === after) return; // chỉ đổi nút chấm nhanh / người được giao quyền — không cần tính lại
+    await rebuildRenLuyenLeaderboard();
   }
 );
