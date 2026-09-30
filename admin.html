@@ -186,6 +186,12 @@
                 <div id="renluyen-bang-tong" hidden style="margin-bottom:24px;">
                   <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện lớp 10C5 — <span id="renluyen-bt-hocky" class="mono"></span></h3>
                   <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Bấm vào một dòng để mở chi tiết và chấm điểm học sinh đó. "Thay đổi trong tuần" tính từ 00:00 thứ Hai (giờ Việt Nam).</p>
+                  <div class="admin-row" style="align-items:flex-end;margin-bottom:8px;">
+                    <div class="field" style="flex:1;min-width:180px;"><label for="renluyen-bt-search">Tìm theo tên</label><input type="search" id="renluyen-bt-search" placeholder="Gõ tên (không cần dấu)" autocomplete="off" /></div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;color:var(--muted);padding-bottom:12px;">
+                      <input type="checkbox" id="renluyen-bt-only-week" /> Chỉ em có thay đổi trong tuần
+                    </label>
+                  </div>
                   <div style="overflow-x:auto;">
                     <table class="data-table" id="renluyen-bt-table">
                       <thead><tr><th style="width:60px;">Hạng</th><th>Họ tên</th><th style="text-align:right;">Điểm rèn luyện</th><th style="text-align:right;">Thay đổi trong tuần</th></tr></thead>

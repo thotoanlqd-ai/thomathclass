@@ -2453,6 +2453,7 @@ function loadRenLuyenBangTong(students) {
   const token = ++renLuyenBtToken;
   wrap.hidden = false;
   body.innerHTML = "";
+  renLuyenBtRows = [];
   emptyEl.hidden = true;
   document.getElementById("renluyen-bt-hocky").textContent = "";
 
@@ -2508,11 +2509,24 @@ function loadRenLuyenBangTong(students) {
   });
 }
 
+let renLuyenBtRows = [];
+
+// Vẽ bảng từ toàn bộ rows (đã xếp hạng), áp dụng ô tìm tên + bộ lọc "có thay đổi trong tuần".
+// Hạng luôn là hạng thật trong cả lớp, không đánh số lại khi lọc.
 function renderRenLuyenBangTong(rows) {
+  if (rows) renLuyenBtRows = rows;
   const body = document.getElementById("renluyen-bt-body");
+  const emptyEl = document.getElementById("renluyen-bt-empty");
   body.innerHTML = "";
+  const keyword = removeDiacritics(document.getElementById("renluyen-bt-search").value.trim()).toLowerCase();
+  const onlyWeek = document.getElementById("renluyen-bt-only-week").checked;
+  const shown = renLuyenBtRows.filter(
+    (r) => (!keyword || removeDiacritics(r.fullName).toLowerCase().includes(keyword)) && (!onlyWeek || r.tuan !== 0)
+  );
+  emptyEl.hidden = shown.length > 0 || !renLuyenBtRows.length;
+  if (!emptyEl.hidden) emptyEl.textContent = "Không có học sinh nào khớp bộ lọc.";
   const mau = (n) => (n > 0 ? "var(--chalk)" : n < 0 ? "var(--pen-red)" : "var(--muted)");
-  rows.forEach((r) => {
+  shown.forEach((r) => {
     const tr = document.createElement("tr");
     tr.style.cursor = "pointer";
     const mono = "'JetBrains Mono', monospace";
@@ -2537,6 +2551,9 @@ function renderRenLuyenBangTong(rows) {
     body.appendChild(tr);
   });
 }
+
+document.getElementById("renluyen-bt-search").addEventListener("input", () => renderRenLuyenBangTong());
+document.getElementById("renluyen-bt-only-week").addEventListener("change", () => renderRenLuyenBangTong());
 
 document.getElementById("btn-renluyen-back-bt").addEventListener("click", () => {
   const sel = document.getElementById("pick-student");
