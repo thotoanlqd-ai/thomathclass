@@ -1,7 +1,7 @@
 // =========================================================
 // ThoMathClass — Cloud Functions
 // =========================================================
-// 6 functions:
+// 7 functions:
 //   claimProduct          (callable)  — khách bấm "Mua ngay": nếu sản phẩm miễn phí
 //                          thì cấp quyền ngay, nếu có giá thì tạo link thanh toán payOS
 //   payosWebhook           (HTTP)      — payOS gọi vào đây khi có người chuyển khoản
@@ -11,7 +11,7 @@
 //   createTuitionPayment   (callable)  — phụ huynh bấm "Đóng học phí": tạo/tái dùng
 //                          link thanh toán payOS cho 1 khoản học phí
 //   capNhatXepHangRenLuyen      (firestore) — mỗi khi có lượt chấm điểm rèn luyện được thêm/sửa/xoá,
-//   capNhatXepHangKhiDoiHocKy   (firestore)   hoặc khi đổi học kỳ hiện tại: tính lại bảng xếp hạng lớp 10C5
+//   capNhatXepHangKhiDoiHocKy   (firestore)   hoặc khi đổi học kỳ hiện tại / capNhatXepHangKhiDoiDanhSach (khi thêm-xoá-đổi tên học sinh 10C5): tính lại bảng xếp hạng lớp 10C5
 //                          -> leaderboard/10C5_<học kỳ> (top 10 công khai) + renluyenHang/{uid} (hạng riêng)
 //
 // Trước khi deploy cần khai báo 3 secret lấy từ trang quản trị payOS:
@@ -498,6 +498,25 @@ exports.capNhatXepHangKhiDoiHocKy = onDocumentWritten(
     const before = event.data.before.exists ? event.data.before.data().hocKyHienTai : null;
     const after = event.data.after.exists ? event.data.after.data().hocKyHienTai : null;
     if (before === after) return; // chỉ đổi nút chấm nhanh / người được giao quyền — không cần tính lại
+    await rebuildRenLuyenLeaderboard();
+  }
+);
+
+// Thêm / xoá / đổi lớp / đổi tên học sinh 10C5 cũng làm thay đổi bảng xếp hạng (sĩ số, danh sách top),
+// dù không có lượt chấm điểm nào mới — nên tính lại ở đây. Đổi thứ tự (order) hay field khác thì bỏ qua.
+exports.capNhatXepHangKhiDoiDanhSach = onDocumentWritten(
+  { region: REGION, document: "roster/{studentId}" },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const truoc = before && before.classId === RENLUYEN_CLASS_ID;
+    const sau = after && after.classId === RENLUYEN_CLASS_ID;
+    if (!truoc && !sau) return; // không liên quan lớp 10C5
+    if (truoc && sau && before.fullName === after.fullName) return; // chỉ đổi field khác
+    if (truoc && !sau) {
+      // Học sinh bị xoá / chuyển khỏi 10C5: bỏ luôn hạng riêng còn sót lại
+      await db.collection("renluyenHang").doc(event.params.studentId).delete();
+    }
     await rebuildRenLuyenLeaderboard();
   }
 );
