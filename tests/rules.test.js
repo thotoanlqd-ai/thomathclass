@@ -32,6 +32,7 @@ before(async () => {
     await db.doc("students/hsB/renluyen/e1").set({ diem: -2, lyDo: "Bí mật của B", hocKy: HK, nguoiChamTen: "Giáo viên", huy: false });
     await db.doc("renluyenTong/hsA").set({ [HK]: 5 });
     await db.doc("renluyenTong/hsB").set({ [HK]: -2 });
+    await db.doc("classStats/10c-lqd").set({ tests: [] });
     // Hai tài liệu do Cloud Function ghi
     await db.doc(`leaderboard/10C5_${HK}`).set({ hocKy: HK, siSo: 3, top: [{ hang: 1, ten: "Thử An", diem: 5 }] });
     await db.doc("renluyenHang/hsA").set({ hocKy: HK, hang: 1, diem: 5, siSo: 3 });
@@ -66,6 +67,14 @@ test("học sinh 10C5 đọc được bảng xếp hạng; người ngoài lớp
   await assertSucceeds(as("hsC").doc(`leaderboard/10C5_${HK}`).get());
   await assertFails(as("hsOther").doc(`leaderboard/10C5_${HK}`).get());
   await assertFails(anon().doc(`leaderboard/10C5_${HK}`).get());
+});
+
+test("học sinh đọc được thống kê lớp mình; lớp khác / chưa đăng nhập thì không; không tự ghi được", async () => {
+  await assertSucceeds(as("hsA").doc("classStats/10c-lqd").get());
+  await assertSucceeds(as(ADMIN_UID).doc("classStats/10c-lqd").get());
+  await assertFails(as("hsOther").doc("classStats/10c-lqd").get());
+  await assertFails(anon().doc("classStats/10c-lqd").get());
+  await assertFails(as("hsA").doc("classStats/10c-lqd").set({ tests: [] }));
 });
 
 test("học sinh không tự ghi được điểm / bảng xếp hạng / hạng", async () => {

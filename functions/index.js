@@ -29,6 +29,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const PayOS = require("@payos/node");
 const { tongDiem, xepHang, layTop } = require("./renluyen-rank");
+const { tinhThongKeLop } = require("./class-stats");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -518,5 +519,36 @@ exports.capNhatXepHangKhiDoiDanhSach = onDocumentWritten(
       await db.collection("renluyenHang").doc(event.params.studentId).delete();
     }
     await rebuildRenLuyenLeaderboard();
+  }
+);
+
+// ---------------------------------------------------------
+// Thống kê điểm kiểm tra cả lớp
+// ---------------------------------------------------------
+// Học sinh không đọc được điểm của nhau, nên Cloud Function tổng hợp (Admin SDK) rồi ghi
+//   classStats/{classId} : { tests:[{label,date,n,tb,max,min,khoang[5]}], capNhatLuc }
+// firestore.rules cho học sinh của đúng lớp đó (và admin) đọc; không ai ghi tay được.
+async function rebuildClassStats(classId) {
+  if (!classId) return;
+  const snap = await db.collection("students").where("classId", "==", classId).get();
+  const tests = tinhThongKeLop(snap.docs.map((d) => d.data().scores || []));
+  await db.collection("classStats").doc(classId).set({
+    tests,
+    capNhatLuc: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  logger.info(`rebuildClassStats: ${classId} — ${tests.length} bài kiểm tra`);
+}
+
+exports.capNhatThongKeLop = onDocumentWritten(
+  { region: REGION, document: "students/{studentId}" },
+  async (event) => {
+    const before = event.data.before.exists ? event.data.before.data() : null;
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    const classBefore = before && before.classId;
+    const classAfter = after && after.classId;
+    const scoresSame = JSON.stringify((before && before.scores) || []) === JSON.stringify((after && after.scores) || []);
+    if (scoresSame && classBefore === classAfter) return; // chỉ đổi nhận xét / field khác
+    const classIds = new Set([classBefore, classAfter].filter(Boolean));
+    for (const id of classIds) await rebuildClassStats(id);
   }
 );

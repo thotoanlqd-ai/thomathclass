@@ -206,6 +206,7 @@ function loadDashboard(user) {
         });
       }
 
+      loadClassStats(d.classId);
       dashLatest.diem = scores.length ? scores[0].date || "" : "";
       dashLatest.nhanxet = comments.length ? comments[0].date || "" : "";
 
@@ -214,6 +215,40 @@ function loadDashboard(user) {
       viewDashboard.hidden = false;
       showDashTab(d.classId === RENLUYEN_CLASS_ID ? "renluyen" : "diem");
     });
+}
+
+// ---------- Thống kê điểm kiểm tra cả lớp ----------
+// Đọc classStats/<classId> do Cloud Function tổng hợp (không chứa điểm từng em); lỗi/không có thì ẩn khối này.
+const CLASS_STATS_BINS = ["Dưới 5", "5 – dưới 6,5", "6,5 – dưới 8", "8 – dưới 9", "9 – 10"];
+
+function loadClassStats(classId) {
+  const box = document.getElementById("class-stats");
+  const list = document.getElementById("class-stats-list");
+  box.hidden = true;
+  list.innerHTML = "";
+  db.collection("classStats")
+    .doc(classId)
+    .get()
+    .then((doc) => {
+      const tests = doc.exists ? doc.data().tests || [] : [];
+      if (!tests.length) return;
+      const fmt = (n) => String(n).replace(".", ",");
+      tests.forEach((t) => {
+        const card = document.createElement("div");
+        card.className = "comment-card";
+        const bins = (t.khoang || [])
+          .map((c, i) => "<span style=\"white-space:nowrap;\">" + CLASS_STATS_BINS[i] + ": <b>" + c + "</b></span>")
+          .join(" · ");
+        card.innerHTML =
+          "<span class=\"date\">" + escapeHtml(t.date || "") + " · " + t.n + " bài</span>" +
+          "<p><b>" + escapeHtml(t.label) + "</b></p>" +
+          "<p>Trung bình: <b>" + fmt(t.tb) + "</b> · Cao nhất: <b>" + fmt(t.max) + "</b> · Thấp nhất: <b>" + fmt(t.min) + "</b></p>" +
+          "<p style=\"margin-top:4px;color:var(--muted);font-size:0.85rem;\">" + bins + "</p>";
+        list.appendChild(card);
+      });
+      box.hidden = false;
+    })
+    .catch((err) => console.error("Không tải được thống kê lớp:", err));
 }
 
 // ---------- Tab dashboard + chấm đỏ nội dung mới ----------

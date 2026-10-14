@@ -95,9 +95,9 @@
 
         <div class="dash-tabs" id="dash-tabs" role="tablist">
           <button type="button" class="dash-tab" role="tab" data-tab="renluyen">Điểm rèn luyện</button>
+          <button type="button" class="dash-tab" role="tab" data-tab="nhatky">Nhật ký lớp học<span class="tab-dot" hidden></span></button>
           <button type="button" class="dash-tab" role="tab" data-tab="diem">Điểm số môn Toán<span class="tab-dot" hidden></span></button>
           <button type="button" class="dash-tab" role="tab" data-tab="nhanxet">Nhận xét của GVCN<span class="tab-dot" hidden></span></button>
-          <button type="button" class="dash-tab" role="tab" data-tab="nhatky">Nhật ký lớp học<span class="tab-dot" hidden></span></button>
           <button type="button" class="dash-tab" role="tab" data-tab="phananh">Phản ánh yêu cầu</button>
         </div>
 
@@ -134,6 +134,10 @@
             <tbody id="score-body"></tbody>
           </table>
           <p class="empty-note" id="score-empty" hidden>Chưa có điểm số nào được cập nhật.</p>
+          <div id="class-stats" hidden style="margin-top:24px;">
+            <p style="margin:0 0 10px;font-weight:700;color:var(--chalk);">Thống kê chung cả lớp</p>
+            <div id="class-stats-list"></div>
+          </div>
         </div>
         </div>
         <div class="dash-pane" data-pane="nhanxet" hidden>

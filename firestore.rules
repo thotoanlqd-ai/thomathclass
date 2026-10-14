@@ -207,6 +207,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // classStats/{classId}: thống kê điểm kiểm tra cả lớp (TB, cao nhất, thấp nhất, số lượng theo khoảng điểm),
+    // không chứa điểm từng em. Đọc: học sinh đúng lớp đó (theo roster) hoặc admin. Ghi: chỉ Cloud Function.
+    match /classStats/{classId} {
+      allow read: if request.auth != null &&
+                     (isAdmin() ||
+                      (exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
+                       get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId));
+      allow write: if false;
+    }
+
     // renluyenHang/{studentId}: hạng + điểm học kỳ hiện tại của RIÊNG từng học sinh
     // ({hocKy, hang, diem, siSo}). Đọc: chính học sinh đó hoặc admin. Ghi: chỉ Cloud Function.
     match /renluyenHang/{studentId} {
