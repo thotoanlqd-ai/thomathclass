@@ -10,6 +10,20 @@ function parseDiem(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Bỏ phần "mã đề ..." khỏi tên bài để mọi mã đề của cùng một bài kiểm tra được tính chung.
+// Ví dụ: "KT 15p - Mã đề 101", "KT 15p (mã 102)", "KT 15p đề A" -> "KT 15p".
+// "đề" đứng một mình chỉ bị bỏ khi theo sau là số ngắn/một chữ cái, để không cắt nhầm "Đề kiểm tra".
+const MA_DE_RE = /(?<![\p{L}\d])(?:(?:mã\s*đề|mã|mđ|md)\s*[:.]?\s*[\p{L}\d]{1,5}|đề\s*[:.]?\s*(?:\d{1,4}|\p{L})(?![\p{L}\d]))/giu;
+
+function tenBaiKiemTra(label) {
+  const s = String(label || "")
+    .replace(MA_DE_RE, " ")
+    .replace(/\(\s*\)|\[\s*\]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\-–—,;:]+|[\s\-–—,;:]+$/g, "");
+  return s || String(label || "").trim();
+}
+
 function khoangIndex(d) {
   if (d < 5) return 0;
   if (d < 6.5) return 1;
@@ -24,7 +38,7 @@ function tinhThongKeLop(studentsScores) {
   studentsScores.forEach((scores) => {
     (scores || []).forEach((s) => {
       const d = parseDiem(s.value);
-      const label = String(s.label || "").trim();
+      const label = tenBaiKiemTra(s.label);
       if (d === null || !label) return;
       const date = s.date || "";
       const key = label.toLowerCase() + "|" + date;
@@ -53,4 +67,4 @@ function tinhThongKeLop(studentsScores) {
   return tests;
 }
 
-module.exports = { MIN_N, KHOANG_LABELS, parseDiem, tinhThongKeLop };
+module.exports = { MIN_N, KHOANG_LABELS, parseDiem, tenBaiKiemTra, tinhThongKeLop };

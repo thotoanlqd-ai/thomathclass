@@ -16,4 +16,13 @@ assert.deepStrictEqual(
 assert.deepStrictEqual(tinhThongKeLop([sc("5"), sc("6")]), []);
 const t2 = tinhThongKeLop([sc("5"), sc("6", "kt 15p"), sc("7"), sc("1", "KT 15p", "2026-10-09"), sc("2", "KT 15p", "2026-10-09"), sc("3", "KT 15p", "2026-10-09")]);
 assert.deepStrictEqual(t2.map((x) => x.date), ["2026-10-09", "2026-10-01"]);
+// gộp mọi mã đề của cùng một bài
+const {tenBaiKiemTra}=require("./class-stats");
+["KT 15p - Mã đề 101","KT 15p (mã 102)","KT 15p đề A","KT 15p Mã đề: 103","KT 15p","KT 15p - Đề 2"].forEach((l)=>assert.strictEqual(tenBaiKiemTra(l),"KT 15p",l));
+assert.strictEqual(tenBaiKiemTra("Đề kiểm tra giữa kì"),"Đề kiểm tra giữa kì");
+assert.strictEqual(tenBaiKiemTra("Mã đề 101"), "Mã đề 101"); // chỉ có mã đề thì giữ nguyên, không để tên rỗng
+const t3 = tinhThongKeLop([sc("5","KT 15p - Mã đề 101"), sc("6","KT 15p - Mã đề 102"), sc("7","KT 15p - Mã đề 103"), sc("8","KT 15p - Mã đề 104")]);
+assert.strictEqual(t3.length, 1);
+assert.strictEqual(t3[0].n, 4);
+assert.strictEqual(t3[0].label, "KT 15p");
 console.log("class-stats OK");
