@@ -1082,3 +1082,19 @@ section { padding: 64px 0; }
   }
   .admin-sidebar.open { transform: translateX(0); }
 }
+
+/* tab học sinh sau đăng nhập */
+.dash-tabs { display: flex; gap: 8px; overflow-x: auto; margin: 18px 0 20px; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.dash-tab {
+  flex: 0 0 auto; position: relative; white-space: nowrap; cursor: pointer;
+  font: inherit; font-size: 0.88rem; font-weight: 600; padding: 8px 16px;
+  border: 1px solid var(--card-border); border-radius: 999px;
+  background: transparent; color: var(--ink);
+}
+.dash-tab.active { background: var(--chalk); border-color: var(--chalk); color: #fff; }
+.dash-tab[hidden] { display: none; }
+.tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e03131; margin-left: 6px; vertical-align: middle; }
+.tab-dot[hidden] { display: none; }
+.dash-pane[hidden] { display: none; }
+.dash-pw { margin-top: 36px; }
+.dash-pw summary { cursor: pointer; font-weight: 700; color: var(--muted); margin-bottom: 12px; }

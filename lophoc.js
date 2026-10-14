@@ -154,6 +154,11 @@ function loadDashboard(user) {
       document.getElementById("dash-avatar-status").textContent = "";
       loadDashAvatar(user.uid);
 
+      // mỗi lần đăng nhập: về tab mặc định, nhật ký 3 ngày, bảng xếp hạng thu gọn
+      dashUid = user.uid;
+      journalDaysShown = JOURNAL_DAYS_STEP;
+      dashLatest = { diem: "", nhanxet: "", nhatky: "" };
+      dashActiveTab = null;
       setupJournalWritePanel();
       loadClassJournal(d.classId);
       setupRenLuyenGrader(user.uid);
@@ -166,6 +171,7 @@ function loadDashboard(user) {
         document.getElementById("renluyen-student-card").hidden = true;
         document.getElementById("renluyen-leaderboard").hidden = true;
       }
+      document.querySelector('#dash-tabs [data-tab="renluyen"]').hidden = d.classId !== RENLUYEN_CLASS_ID;
 
       // điểm số
       const scoreBody = document.getElementById("score-body");
@@ -200,11 +206,79 @@ function loadDashboard(user) {
         });
       }
 
+      dashLatest.diem = scores.length ? scores[0].date || "" : "";
+      dashLatest.nhanxet = comments.length ? comments[0].date || "" : "";
+
       viewClasses.hidden = true;
       viewRoster.hidden = true;
       viewDashboard.hidden = false;
+      showDashTab(d.classId === RENLUYEN_CLASS_ID ? "renluyen" : "diem");
     });
 }
+
+// ---------- Tab dashboard + chấm đỏ nội dung mới ----------
+// Mốc "đã xem" của từng tab lưu trong localStorage (khóa seen_<uid>_<tab>), là giá trị "mới nhất" của tab
+// tại lần mở gần nhất: nhật ký = createdAt lớn nhất (millis), điểm số/nhận xét = chuỗi date lớn nhất.
+// Chưa có mốc (lần đầu trên thiết bị) -> đặt mốc = nội dung hiện có, không hiện chấm. Lỗi localStorage -> không hiện chấm.
+const JOURNAL_DAYS_STEP = 3;
+let journalDaysShown = JOURNAL_DAYS_STEP;
+let journalEntries = [];
+let dashUid = null;
+let dashActiveTab = null;
+let dashLatest = { diem: "", nhanxet: "", nhatky: "" };
+
+function seenKey(tab) {
+  return "seen_" + dashUid + "_" + tab;
+}
+
+function readSeen(tab) {
+  try {
+    return localStorage.getItem(seenKey(tab));
+  } catch (e) {
+    return undefined;
+  }
+}
+
+function writeSeen(tab) {
+  try {
+    localStorage.setItem(seenKey(tab), String(dashLatest[tab]));
+  } catch (e) {}
+}
+
+function hasNewContent(tab) {
+  const seen = readSeen(tab);
+  if (seen === undefined) return false; // localStorage lỗi
+  if (seen === null) {
+    writeSeen(tab);
+    return false;
+  }
+  const latest = dashLatest[tab];
+  return tab === "nhatky" ? Number(latest) > Number(seen) : String(latest) > seen;
+}
+
+function refreshTabDot(tab) {
+  const btn = document.querySelector('#dash-tabs [data-tab="' + tab + '"]');
+  const dot = btn && btn.querySelector(".tab-dot");
+  if (!dot) return;
+  if (dashActiveTab === tab) {
+    writeSeen(tab);
+    dot.hidden = true;
+  } else {
+    dot.hidden = !hasNewContent(tab);
+  }
+}
+
+function showDashTab(tab) {
+  dashActiveTab = tab;
+  document.querySelectorAll("#dash-tabs .dash-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".dash-pane").forEach((p) => (p.hidden = p.dataset.pane !== tab));
+  ["diem", "nhanxet", "nhatky"].forEach(refreshTabDot);
+}
+
+document.getElementById("dash-tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest(".dash-tab");
+  if (btn) showDashTab(btn.dataset.tab);
+});
 
 // ---------- Ảnh đại diện cá nhân (học sinh tự đổi sau khi đăng nhập) ----------
 function loadDashAvatar(uid) {
@@ -263,64 +337,86 @@ function escapeHtml(str) {
 
 // ---------- Nhật ký lớp học (xem, và viết/sửa/xoá nếu có chức vụ lớp) ----------
 function loadClassJournal(classId) {
-  const listEl = document.getElementById("journal-list");
-  const emptyEl = document.getElementById("journal-empty");
-  listEl.innerHTML = "";
-  emptyEl.hidden = true;
-
-  const user = auth.currentUser;
-
   db.collection("classJournal")
     .where("classId", "==", classId)
     .get()
     .then((snap) => {
       const entries = [];
       snap.forEach((doc) => entries.push(Object.assign({ id: doc.id }, doc.data())));
-      entries.sort((a, b) => {
-        const ta = a.createdAt ? a.createdAt.toMillis() : 0;
-        const tb = b.createdAt ? b.createdAt.toMillis() : 0;
-        return tb - ta;
-      });
-
-      if (!entries.length) {
-        emptyEl.hidden = false;
-        return;
-      }
-      entries.forEach((entry) => {
-        const dateStr = entry.createdAt ? new Date(entry.createdAt.toMillis()).toLocaleDateString("vi-VN") : "";
-        const imagesHtml = (entry.images || [])
-          .map((url) => `<img src="${escapeHtml(url)}" class="journal-thumb" />`)
-          .join("");
-        const authorLineHtml = entry.authorName
-          ? `<p class="date" style="margin-top:6px;">Đăng bởi: ${escapeHtml(entry.authorName)}${
-              entry.authorRole ? " - " + escapeHtml(entry.authorRole) : ""
-            }</p>`
-          : "";
-        const card = document.createElement("div");
-        card.className = "journal-post";
-        card.innerHTML = `
-          <span class="date">${escapeHtml(dateStr)}</span>
-          <p>${escapeHtml(entry.content || "")}</p>
-          <div class="journal-images">${imagesHtml}</div>
-          ${authorLineHtml}
-        `;
-        if (user && entry.authorUid && entry.authorUid === user.uid) {
-          const actions = document.createElement("div");
-          actions.style.marginTop = "8px";
-          actions.style.display = "flex";
-          actions.style.gap = "14px";
-          actions.innerHTML = `
-            <button type="button" class="mini-btn" data-action="edit">Sửa</button>
-            <button type="button" class="mini-btn" data-action="delete" style="color:var(--muted);">Xoá</button>
-          `;
-          actions.querySelector('[data-action="edit"]').addEventListener("click", () => startEditMyJournalEntry(entry));
-          actions.querySelector('[data-action="delete"]').addEventListener("click", () => deleteMyJournalEntry(entry));
-          card.appendChild(actions);
-        }
-        listEl.appendChild(card);
-      });
+      entries.sort((a, b) => entryMillis(b) - entryMillis(a));
+      journalEntries = entries;
+      dashLatest.nhatky = entries.length ? entryMillis(entries[0]) : 0;
+      renderClassJournal();
+      refreshTabDot("nhatky");
     })
     .catch((err) => console.error("loadClassJournal lỗi:", err));
+}
+
+// Bài vừa đăng có thể chưa có createdAt (serverTimestamp chưa về) -> coi là bây giờ.
+function entryMillis(entry) {
+  return entry.createdAt ? entry.createdAt.toMillis() : Date.now();
+}
+
+function renderClassJournal() {
+  const listEl = document.getElementById("journal-list");
+  const emptyEl = document.getElementById("journal-empty");
+  const moreBtn = document.getElementById("journal-more");
+  listEl.innerHTML = "";
+  emptyEl.hidden = journalEntries.length > 0;
+
+  const user = auth.currentUser;
+  const days = [];
+  let hasMore = false;
+  journalEntries.forEach((entry) => {
+    const d = new Date(entryMillis(entry));
+    const dayKey = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+    if (days.indexOf(dayKey) === -1) days.push(dayKey);
+    if (days.length > journalDaysShown) {
+      hasMore = true;
+      return;
+    }
+    listEl.appendChild(buildJournalCard(entry, user));
+  });
+  moreBtn.hidden = !hasMore;
+}
+
+document.getElementById("journal-more").addEventListener("click", () => {
+  journalDaysShown += JOURNAL_DAYS_STEP;
+  renderClassJournal();
+});
+
+function buildJournalCard(entry, user) {
+  const dateStr = entry.createdAt ? new Date(entry.createdAt.toMillis()).toLocaleDateString("vi-VN") : "";
+  const imagesHtml = (entry.images || [])
+    .map((url) => `<img src="${escapeHtml(url)}" class="journal-thumb" />`)
+    .join("");
+  const authorLineHtml = entry.authorName
+    ? `<p class="date" style="margin-top:6px;">Đăng bởi: ${escapeHtml(entry.authorName)}${
+        entry.authorRole ? " - " + escapeHtml(entry.authorRole) : ""
+      }</p>`
+    : "";
+  const card = document.createElement("div");
+  card.className = "journal-post";
+  card.innerHTML = `
+    <span class="date">${escapeHtml(dateStr)}</span>
+    <p>${escapeHtml(entry.content || "")}</p>
+    <div class="journal-images">${imagesHtml}</div>
+    ${authorLineHtml}
+  `;
+  if (user && entry.authorUid && entry.authorUid === user.uid) {
+    const actions = document.createElement("div");
+    actions.style.marginTop = "8px";
+    actions.style.display = "flex";
+    actions.style.gap = "14px";
+    actions.innerHTML = `
+      <button type="button" class="mini-btn" data-action="edit">Sửa</button>
+      <button type="button" class="mini-btn" data-action="delete" style="color:var(--muted);">Xoá</button>
+    `;
+    actions.querySelector('[data-action="edit"]').addEventListener("click", () => startEditMyJournalEntry(entry));
+    actions.querySelector('[data-action="delete"]').addEventListener("click", () => deleteMyJournalEntry(entry));
+    card.appendChild(actions);
+  }
+  return card;
 }
 
 // ---------- Khung viết bài Nhật ký lớp học cho học sinh có chức vụ ----------
@@ -865,6 +961,9 @@ function loadRenLuyenLeaderboard(uid, myName) {
   const body = document.getElementById("renluyen-lb-body");
   const emptyEl = document.getElementById("renluyen-lb-empty");
   const table = document.getElementById("renluyen-lb-table");
+  const toggle = document.getElementById("renluyen-lb-toggle");
+  setLeaderboardExpanded(false);
+  toggle.hidden = false;
   box.hidden = false;
   body.innerHTML = "";
   meEl.textContent = "";
@@ -872,6 +971,7 @@ function loadRenLuyenLeaderboard(uid, myName) {
   table.hidden = false;
 
   const showEmpty = (msg) => {
+    toggle.hidden = true;
     table.hidden = true;
     emptyEl.textContent = msg;
     emptyEl.hidden = false;
@@ -923,3 +1023,14 @@ function loadRenLuyenLeaderboard(uid, myName) {
       showEmpty("Không tải được bảng xếp hạng lúc này.");
     });
 }
+
+function setLeaderboardExpanded(open) {
+  document.getElementById("renluyen-lb-wrap").hidden = !open;
+  const toggle = document.getElementById("renluyen-lb-toggle");
+  toggle.textContent = open ? "Ẩn bảng xếp hạng ▴" : "Xem bảng xếp hạng ▾";
+  toggle.setAttribute("aria-expanded", String(open));
+}
+
+document.getElementById("renluyen-lb-toggle").addEventListener("click", () => {
+  setLeaderboardExpanded(document.getElementById("renluyen-lb-wrap").hidden);
+});
