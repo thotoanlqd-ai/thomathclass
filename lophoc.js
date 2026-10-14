@@ -172,6 +172,8 @@ function loadDashboard(user) {
         document.getElementById("renluyen-leaderboard").hidden = true;
       }
       document.querySelector('#dash-tabs [data-tab="renluyen"]').hidden = d.classId !== RENLUYEN_CLASS_ID;
+      // tên tab: chỉ lớp 10C5 ghi "GVCN", các lớp khác ghi "GV"
+      document.querySelector('#dash-tabs [data-tab="nhanxet"]').firstChild.nodeValue = d.classId === RENLUYEN_CLASS_ID ? "Nhận xét của GVCN" : "Nhận xét của GV";
 
       // điểm số
       const scoreBody = document.getElementById("score-body");
