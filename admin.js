@@ -1170,12 +1170,15 @@ function loadDeleteList() {
           <td style="white-space:nowrap;">
             <button class="mini-btn" data-action="reset" data-uid="${doc.id}">Reset mật khẩu</button>
             &nbsp;
+            ${classId === "10c-lqd" ? `<button class="mini-btn" data-action="restore-rl" data-uid="${doc.id}">Khôi phục RL</button>&nbsp;` : ""}
             <button class="mini-btn" data-action="delete-one" data-uid="${doc.id}" style="color:var(--muted);">Xoá</button>
           </td>
         `;
         tr.querySelector(".class-role-select").value = d.classRole || "";
         tr.querySelector(".class-role-select").addEventListener("change", (e) => saveClassRole(doc.id, e.target.value));
         tr.querySelector('[data-action="reset"]').addEventListener("click", () => resetStudentPassword(doc.id));
+        const restoreBtn = tr.querySelector('[data-action="restore-rl"]');
+        if (restoreBtn) restoreBtn.addEventListener("click", () => restoreRenLuyenFromOldUid(doc.id));
         tr.querySelector('[data-action="delete-one"]').addEventListener("click", () => {
           const s = deleteRosterCache.find((x) => x.uid === doc.id);
           if (!confirm(`Xoá học sinh "${s.fullName}"?\n\nKhông thể hoàn tác.`)) return;
@@ -1370,6 +1373,57 @@ function resetStudentPassword(oldUid) {
       console.error(err);
       statusEl.textContent = "Lỗi khi reset: " + err.message;
     });
+}
+
+// Khôi phục điểm rèn luyện cho học sinh đã bị reset mật khẩu trước khi có tính năng tự chép dữ liệu.
+// Chép các lượt chấm (students/<uid cũ>/renluyen) + tổng điểm (renluyenTong/<uid cũ>) sang uid hiện tại.
+// uid cũ xem ở Firebase Console > Authentication (tài khoản cũ có cùng mã đăng nhập).
+async function restoreRenLuyenFromOldUid(newUid) {
+  const statusEl = document.getElementById("delete-status");
+  const student = deleteRosterCache.find((s) => s.uid === newUid);
+  if (!student) return;
+  const oldUid = (prompt(`Khôi phục điểm rèn luyện cho "${student.fullName}".
+
+Dán UID CŨ của em (Firebase Console > Authentication):`) || "").trim();
+  if (!oldUid) return;
+  if (oldUid === newUid) {
+    alert("UID cũ trùng với UID hiện tại của em.");
+    return;
+  }
+  try {
+    statusEl.textContent = "Đang kiểm tra dữ liệu cũ...";
+    const [oldEntries, oldTong, newEntries, oldRoster] = await Promise.all([
+      db.collection("students").doc(oldUid).collection("renluyen").get(),
+      db.collection("renluyenTong").doc(oldUid).get(),
+      db.collection("students").doc(newUid).collection("renluyen").limit(1).get(),
+      db.collection("roster").doc(oldUid).get(),
+    ]);
+    if (oldRoster.exists) {
+      throw new Error("UID này vẫn đang là một học sinh trong danh sách (" + (oldRoster.data().fullName || "?") + "), không phải tài khoản cũ.");
+    }
+    if (oldEntries.empty && !oldTong.exists) throw new Error("Không tìm thấy điểm rèn luyện nào ở UID cũ này.");
+    if (!newEntries.empty) {
+      throw new Error("Tài khoản hiện tại của em đã có lượt chấm rèn luyện, không chép đè để tránh cộng trùng.");
+    }
+    if (
+      !confirm(
+        `Tìm thấy ${oldEntries.size} lượt chấm rèn luyện${oldTong.exists ? " và tổng điểm " + JSON.stringify(oldTong.data()) : ""}.
+
+Chép sang "${student.fullName}"?`
+      )
+    ) {
+      statusEl.textContent = "";
+      return;
+    }
+    const batch = db.batch();
+    oldEntries.forEach((d) => batch.set(db.collection("students").doc(newUid).collection("renluyen").doc(d.id), d.data()));
+    if (oldTong.exists) batch.set(db.collection("renluyenTong").doc(newUid), oldTong.data());
+    await batch.commit();
+    statusEl.textContent = `Đã khôi phục ${oldEntries.size} lượt chấm cho ${student.fullName}.`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi khi khôi phục: " + err.message;
+  }
 }
 
 // Thử tạo tài khoản mới với mã dựa trên baseCode, tự thêm số nếu bị trùng (email đã tồn tại)
