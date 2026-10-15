@@ -1293,7 +1293,7 @@ document.getElementById("btn-delete-whole-class").addEventListener("click", () =
 
 // ==========================================================
 // RESET MẬT KHẨU: tạo lại tài khoản với mật khẩu mặc định,
-// giữ nguyên điểm số + nhận xét cũ (mã đăng nhập có thể đổi nhẹ)
+// giữ nguyên điểm số + nhận xét + điểm rèn luyện (lượt chấm, tổng điểm, quyền chấm) + ảnh đại diện (mã đăng nhập có thể đổi nhẹ)
 // ==========================================================
 function resetStudentPassword(oldUid) {
   const statusEl = document.getElementById("delete-status");
@@ -1304,7 +1304,7 @@ function resetStudentPassword(oldUid) {
     !confirm(
       `Reset mật khẩu cho "${student.fullName}" về mặc định (123abc)?\n\n` +
         `Mã đăng nhập có thể đổi nhẹ (thêm số ở cuối), hệ thống sẽ báo mã mới sau khi xong.\n` +
-        `Điểm số và nhận xét cũ sẽ được giữ nguyên.`
+        `Điểm số, nhận xét và điểm rèn luyện cũ sẽ được giữ nguyên.`
     )
   ) {
     return;
@@ -1315,8 +1315,11 @@ function resetStudentPassword(oldUid) {
   Promise.all([
     db.collection("roster").doc(oldUid).get(),
     db.collection("students").doc(oldUid).get(),
+    db.collection("students").doc(oldUid).collection("renluyen").get(),
+    db.collection("renluyenTong").doc(oldUid).get(),
+    db.collection("studentAvatars").doc(oldUid).get(),
   ])
-    .then(([rosterDoc, studentDoc]) => {
+    .then(([rosterDoc, studentDoc, renluyenSnap, tongDoc, avatarDoc]) => {
       if (!rosterDoc.exists || !studentDoc.exists) {
         throw new Error("Không tìm thấy dữ liệu học sinh này.");
       }
@@ -1326,7 +1329,27 @@ function resetStudentPassword(oldUid) {
       const classId = rosterData.classId;
       const fullName = rosterData.fullName;
 
-      return tryCreateWithFreeCode(baseCode, classId, fullName, studentData);
+      // Dữ liệu gắn với uid cũ phải chép sang uid mới, nếu không sẽ mất sau khi reset
+      const carry = {
+        renluyen: renluyenSnap.docs.map((d) => ({ id: d.id, data: d.data() })),
+        tong: tongDoc.exists ? tongDoc.data() : null,
+        avatar: avatarDoc.exists ? avatarDoc.data() : null,
+      };
+      return tryCreateWithFreeCode(baseCode, classId, fullName, studentData, carry).then((res) =>
+        // người được giao quyền chấm điểm rèn luyện: đổi uid cũ -> uid mới trong config
+        db
+          .collection("config")
+          .doc("renluyen")
+          .get()
+          .then((cfg) => {
+            const ds = cfg.exists ? cfg.data().nguoiDuocCham || [] : [];
+            if (ds.indexOf(oldUid) === -1) return;
+            return db.collection("config").doc("renluyen").update({
+              nguoiDuocCham: ds.filter((u) => u !== oldUid).concat([res.uid]),
+            });
+          })
+          .then(() => res.code)
+      );
     })
     .then((newCode) => {
       // Xoá bản ghi cũ (tài khoản đăng nhập cũ trong Firebase Auth sẽ mồ côi, không dùng được nữa nhưng không xoá hết được từ trình duyệt)
@@ -1350,7 +1373,9 @@ function resetStudentPassword(oldUid) {
 }
 
 // Thử tạo tài khoản mới với mã dựa trên baseCode, tự thêm số nếu bị trùng (email đã tồn tại)
-function tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, attempt) {
+// carry: dữ liệu gắn với uid cũ cần chép sang uid mới ({renluyen:[{id,data}], tong, avatar}). Trả về {code, uid}.
+function tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, carry, attempt) {
+  carry = carry || {};
   attempt = attempt || 1;
   const candidateCode = attempt === 1 ? baseCode : baseCode + "-" + attempt;
   const email = candidateCode + "@" + LOGIN_EMAIL_DOMAIN;
@@ -1371,16 +1396,21 @@ function tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, atte
             scores: oldStudentData.scores || [],
             comments: oldStudentData.comments || [],
           }),
+        ...(carry.renluyen || []).map((e) =>
+          db.collection("students").doc(uid).collection("renluyen").doc(e.id).set(e.data)
+        ),
+        carry.tong ? db.collection("renluyenTong").doc(uid).set(carry.tong) : null,
+        carry.avatar ? db.collection("studentAvatars").doc(uid).set(carry.avatar) : null,
       ])
         .then(() => secondaryAuth.signOut())
-        .then(() => candidateCode);
+        .then(() => ({ code: candidateCode, uid }));
     })
     .catch((err) => {
       try {
         secondaryAuth.signOut();
       } catch (e) {}
       if (err.code === "auth/email-already-in-use" && attempt < 20) {
-        return tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, attempt + 1);
+        return tryCreateWithFreeCode(baseCode, classId, fullName, oldStudentData, carry, attempt + 1);
       }
       throw err;
     });
