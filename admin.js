@@ -280,6 +280,7 @@ function loadStudentEditor(uid) {
         currentStudentData.nextMonthTuitionOverride === undefined || currentStudentData.nextMonthTuitionOverride === null
           ? ""
           : currentStudentData.nextMonthTuitionOverride;
+      document.getElementById("tuition-override-note").value = currentStudentData.nextMonthTuitionNote || "";
       document.getElementById("tuition-override-status").textContent = "";
       document.getElementById("tuition-fixed").value =
         currentStudentData.fixedTuitionAmount === undefined || currentStudentData.fixedTuitionAmount === null
@@ -306,10 +307,17 @@ document.getElementById("btn-save-tuition-override").addEventListener("click", (
     return;
   }
   statusEl.textContent = "Đang lưu...";
+  const overrideNote = document.getElementById("tuition-override-note").value.trim();
   const update =
     raw === ""
-      ? { nextMonthTuitionOverride: firebase.firestore.FieldValue.delete() }
-      : { nextMonthTuitionOverride: Number(raw) };
+      ? {
+          nextMonthTuitionOverride: firebase.firestore.FieldValue.delete(),
+          nextMonthTuitionNote: firebase.firestore.FieldValue.delete(),
+        }
+      : {
+          nextMonthTuitionOverride: Number(raw),
+          nextMonthTuitionNote: overrideNote || firebase.firestore.FieldValue.delete(),
+        };
   db.collection("students")
     .doc(currentStudentUid)
     .set(update, { merge: true })
@@ -1814,6 +1822,13 @@ function initTuitionPanel() {
   currentTuitionClassId = TUITION_CLASS_IDS[0];
   loadTuitionTable(currentTuitionClassId);
   document.getElementById("tuition-bulk-month").value = currentMonthKeyAdmin();
+  const bulkClassEl = document.getElementById("tuition-bulk-class");
+  CLASS_LIST.filter((c) => TUITION_CLASS_IDS.indexOf(c.id) !== -1).forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    bulkClassEl.appendChild(opt);
+  });
 }
 
 // Đổi số tiền cho mọi khoản chưa đóng của 1 tháng (3 lớp). Học sinh có fixedTuitionAmount = 0
@@ -1833,9 +1848,12 @@ document.getElementById("btn-tuition-bulk").addEventListener("click", () => {
     return;
   }
   const amount = Number(rawAmount);
+  const bulkClassId = document.getElementById("tuition-bulk-class").value;
+  const targetClassIds = bulkClassId ? [bulkClassId] : TUITION_CLASS_IDS;
+  const targetLabel = bulkClassId ? "lớp đã chọn" : "3 lớp";
   if (
     !confirm(
-      `Đặt học phí tháng ${tuitionMonthLabelAdmin(month)} = ${amount.toLocaleString("vi-VN")}đ cho mọi khoản chưa đóng của 3 lớp?`
+      `Đặt học phí tháng ${tuitionMonthLabelAdmin(month)} = ${amount.toLocaleString("vi-VN")}đ cho mọi khoản chưa đóng của ${targetLabel}?`
     )
   )
     return;
@@ -1848,7 +1866,7 @@ document.getElementById("btn-tuition-bulk").addEventListener("click", () => {
     .then(([tuitionSnap, rosterSnap]) => {
       const names = {};
       rosterSnap.forEach((d) => (names[d.id] = d.data().fullName));
-      const docs = tuitionSnap.docs.filter((d) => TUITION_CLASS_IDS.indexOf(d.data().classId) !== -1);
+      const docs = tuitionSnap.docs.filter((d) => targetClassIds.indexOf(d.data().classId) !== -1);
       return Promise.all(
         docs.map((d) =>
           db.collection("students").doc(d.data().studentId).get().then((s) => ({ doc: d, student: s.exists ? s.data() : {} }))
@@ -1890,6 +1908,71 @@ document.getElementById("btn-tuition-bulk").addEventListener("click", () => {
         (freeNames.length ? ` Miễn học phí: ${freeNames.join(", ")}.` : "") +
         (skippedPaid ? ` ${skippedPaid} khoản đã đóng trước đó — không đổi (kiểm tra nếu cần hoàn tiền chênh lệch).` : "");
       loadTuitionTable(currentTuitionClassId);
+    })
+    .catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
+
+// Dùng trước ngày 27 (khi học phí tháng chưa được tạo): đặt "học phí riêng" 1 lần cho từng học sinh
+// của lớp đã chọn. Học sinh được miễn (fixedTuitionAmount = 0) bị bỏ qua để vẫn giữ miễn.
+document.getElementById("btn-tuition-preset").addEventListener("click", () => {
+  const statusEl = document.getElementById("tuition-bulk-status");
+  const classId = document.getElementById("tuition-bulk-class").value;
+  const rawAmount = document.getElementById("tuition-bulk-amount").value.trim();
+  const note = document.getElementById("tuition-bulk-note").value.trim();
+  if (!classId) {
+    statusEl.textContent = "Chọn 1 lớp cụ thể.";
+    return;
+  }
+  if (rawAmount === "" || isNaN(Number(rawAmount)) || Number(rawAmount) <= 0) {
+    statusEl.textContent = "Số tiền phải lớn hơn 0.";
+    return;
+  }
+  const amount = Number(rawAmount);
+  if (
+    !confirm(
+      `Đặt học phí riêng ${amount.toLocaleString("vi-VN")}đ (chỉ lần tính tiếp theo) cho mọi học sinh của lớp đã chọn? Ghi đè học phí riêng đã đặt trước đó.`
+    )
+  )
+    return;
+  statusEl.textContent = "Đang cập nhật...";
+
+  db.collection("roster")
+    .where("classId", "==", classId)
+    .get()
+    .then((rosterSnap) =>
+      Promise.all(
+        rosterSnap.docs.map((r) =>
+          db.collection("students").doc(r.id).get().then((s) => ({ uid: r.id, name: r.data().fullName, student: s.exists ? s.data() : {} }))
+        )
+      )
+    )
+    .then((rows) => {
+      const batch = db.batch();
+      const done = [];
+      const skipped = [];
+      rows.forEach(({ uid, name, student }) => {
+        if (student.fixedTuitionAmount === 0) {
+          skipped.push(name || uid);
+          return;
+        }
+        batch.set(
+          db.collection("students").doc(uid),
+          {
+            nextMonthTuitionOverride: amount,
+            nextMonthTuitionNote: note || firebase.firestore.FieldValue.delete(),
+          },
+          { merge: true }
+        );
+        done.push(name || uid);
+      });
+      return batch.commit().then(() => ({ done, skipped }));
+    })
+    .then(({ done, skipped }) => {
+      statusEl.textContent =
+        `✓ Đã đặt trước cho ${done.length} học sinh.` + (skipped.length ? ` Bỏ qua (được miễn): ${skipped.join(", ")}.` : "");
     })
     .catch((err) => {
       console.error(err);

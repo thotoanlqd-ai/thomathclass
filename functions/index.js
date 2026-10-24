@@ -111,6 +111,7 @@ exports.generateMonthlyTuition = onSchedule(
           ? fixedAmount
           : DEFAULT_TUITION_AMOUNT;
       const isFree = amount === 0;
+      const overrideNote = typeof override === "number" ? studentData.nextMonthTuitionNote : null;
 
       await tuitionRef.set({
         classId,
@@ -119,7 +120,7 @@ exports.generateMonthlyTuition = onSchedule(
         amount,
         // Miễn học phí: ghi luôn "đã đóng" để phụ huynh không thấy nút đóng tiền
         status: isFree ? "đã đóng" : "chưa đóng",
-        note: null,
+        note: overrideNote || null,
         currentOrderCode: null,
         currentQrCode: null,
         currentCheckoutUrl: null,
@@ -136,7 +137,10 @@ exports.generateMonthlyTuition = onSchedule(
 
       // Học phí riêng chỉ áp dụng cho đúng 1 lần sinh học phí tiếp theo — dùng xong xoá luôn
       if (override !== null && override !== undefined) {
-        await studentRef.update({ nextMonthTuitionOverride: admin.firestore.FieldValue.delete() });
+        await studentRef.update({
+          nextMonthTuitionOverride: admin.firestore.FieldValue.delete(),
+          nextMonthTuitionNote: admin.firestore.FieldValue.delete(),
+        });
       }
     }
 

@@ -261,6 +261,7 @@
                   <h4 style="margin:22px 0 10px;font-size:0.92rem;">Học phí riêng (chỉ áp dụng cho lần tính học phí tiếp theo, dùng xong tự xoá)</h4>
                   <div class="admin-row">
                     <div class="field" style="max-width:220px;"><label>Số tiền (VNĐ, để trống = mặc định 800.000đ)</label><input type="number" id="tuition-override" min="0" step="10000" placeholder="Vd: 500000" /></div>
+                    <div class="field" style="flex:1;min-width:200px;"><label>Ghi chú hiện cho phụ huynh (tuỳ chọn)</label><input type="text" id="tuition-override-note" placeholder="Vd: Nghỉ 2 tuần ôn và thi IELTS" /></div>
                     <button class="btn btn-outline btn-small" id="btn-save-tuition-override">Lưu</button>
                   </div>
                   <p class="field-error" id="tuition-override-status"></p>
@@ -430,9 +431,11 @@
                   <p style="color:var(--muted);font-size:0.82rem;margin:0 0 10px;">Áp dụng cho mọi khoản <strong>chưa đóng</strong> của tháng đã chọn. Học sinh có "học phí cố định" = 0 sẽ được ghi là miễn (đã đóng). Khoản đã đóng không bị đổi.</p>
                   <div class="admin-row">
                     <div class="field" style="max-width:150px;"><label>Tháng</label><input type="month" id="tuition-bulk-month" /></div>
+                    <div class="field" style="max-width:170px;"><label>Lớp</label><select id="tuition-bulk-class"><option value="">Cả 3 lớp</option></select></div>
                     <div class="field" style="max-width:170px;"><label>Số tiền (VNĐ)</label><input type="number" id="tuition-bulk-amount" min="0" step="10000" placeholder="Vd: 600000" /></div>
                     <div class="field" style="flex:1;min-width:200px;"><label>Ghi chú hiện cho phụ huynh</label><input type="text" id="tuition-bulk-note" placeholder="Vd: Nghỉ 1 tuần khai giảng" /></div>
                     <button class="btn btn-outline btn-small" id="btn-tuition-bulk">Áp dụng</button>
+                    <button class="btn btn-outline btn-small" id="btn-tuition-preset" title="Dùng khi tháng chưa được tạo (trước ngày 27): đặt học phí riêng 1 lần cho từng học sinh của lớp đã chọn">Đặt trước cho cả lớp</button>
                   </div>
                   <p class="field-error" id="tuition-bulk-status"></p>
                 </div>
