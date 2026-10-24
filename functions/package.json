@@ -2,7 +2,7 @@
   "name": "functions",
   "description": "Cloud Functions cho ThoMathClass (thanh toán payOS)",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "scripts": {
