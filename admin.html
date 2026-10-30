@@ -190,6 +190,15 @@
             <!-- ===== HỌC SINH & LỚP HỌC — Quản lý danh sách học sinh ===== -->
             <div class="admin-section" data-section="quan-ly-danh-sach">
 
+              <!-- Sĩ số hiện tại: lớp đang chọn + các lớp khác -->
+              <div class="panel" id="class-count-card" style="display:flex;flex-wrap:wrap;align-items:center;gap:18px 28px;">
+                <div>
+                  <p style="margin:0;font-size:0.8rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);">Sĩ số hiện tại · <span id="class-count-name"></span></p>
+                  <p style="margin:2px 0 0;line-height:1;"><span id="class-count-number" style="font-size:3rem;font-weight:800;">…</span> <span style="color:var(--muted);">học sinh</span></p>
+                </div>
+                <div id="class-count-chips" style="display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:220px;"></div>
+              </div>
+
               <!-- Nhập điểm / nhận xét -->
               <div class="panel">
                 <h3 style="margin:0 0 16px;font-size:1.05rem;">✏️ Nhập điểm &amp; nhận xét</h3>

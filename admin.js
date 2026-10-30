@@ -232,6 +232,7 @@ document.getElementById("pick-class").addEventListener("change", (e) => {
 
 function loadStudentPicker(classId) {
   currentStudentClassId = classId;
+  refreshClassCounts();
   const pickStudent = document.getElementById("pick-student");
   pickStudent.innerHTML = '<option value="">— Đang tải... —</option>';
   document.getElementById("student-editor").hidden = true;
@@ -2942,3 +2943,42 @@ document.getElementById("btn-link-confirm").addEventListener("click", async () =
   loadDeleteList();
   loadStudentPicker(document.getElementById("pick-class").value);
 });
+
+// ==========================================================
+// SĨ SỐ HIỆN TẠI — thẻ đầu mục "Quản lý danh sách học sinh"
+// Mỗi bản ghi roster = một học sinh của một lớp (kể cả hồ sơ lớp phụ), nên đếm theo classId.
+// ==========================================================
+function refreshClassCounts() {
+  const numberEl = document.getElementById("class-count-number");
+  const chipsEl = document.getElementById("class-count-chips");
+  const selected = currentStudentClassId || document.getElementById("pick-class").value;
+  document.getElementById("class-count-name").textContent = (CLASS_LIST.find((c) => c.id === selected) || {}).name || "";
+  db.collection("roster")
+    .get()
+    .then((snap) => {
+      const counts = {};
+      snap.forEach((doc) => {
+        const id = doc.data().classId;
+        counts[id] = (counts[id] || 0) + 1;
+      });
+      numberEl.textContent = counts[selected] || 0;
+      chipsEl.innerHTML = "";
+      CLASS_LIST.forEach((c) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "btn btn-outline btn-small";
+        chip.style.cssText = c.id === selected ? "font-weight:800;border-width:2px;" : "";
+        chip.textContent = c.name + ": " + (counts[c.id] || 0);
+        chip.addEventListener("click", () => {
+          const sel = document.getElementById("pick-class");
+          sel.value = c.id;
+          loadStudentPicker(c.id);
+        });
+        chipsEl.appendChild(chip);
+      });
+    })
+    .catch((err) => {
+      console.error("Không đếm được sĩ số:", err);
+      numberEl.textContent = "?";
+    });
+}
