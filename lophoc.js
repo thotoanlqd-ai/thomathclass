@@ -23,6 +23,9 @@ let currentClassId = null;
 let myClassId = null;
 let myClassRole = null;
 let myFullName = null;
+// Hồ sơ lớp đang xem. Một tài khoản có thể học nhiều lớp: hồ sơ gốc có id = uid đăng nhập,
+// hồ sơ lớp thêm có id "uid~classId" (xem renluyen.js). Điểm, nhận xét, rèn luyện đều theo hồ sơ này.
+let activeProfileId = null;
 
 // ---------- Render 6 lớp học ----------
 function renderClassGrid() {
@@ -126,19 +129,65 @@ function doLogin() {
 }
 
 // ---------- Dashboard cá nhân ----------
-function loadDashboard(user) {
+// Tìm các lớp của tài khoản (hồ sơ gốc roster/<uid> + các hồ sơ phụ có authUid = uid), chọn 1 lớp để hiện.
+// wantedProfileId: lớp muốn mở (khi bấm đổi lớp); bỏ trống thì ưu tiên lớp vừa chọn ở màn đăng nhập.
+function loadDashboard(user, wantedProfileId) {
   Promise.all([
-    db.collection("students").doc(user.uid).get(),
     db.collection("roster").doc(user.uid).get(),
+    db.collection("roster").where("authUid", "==", user.uid).get(),
   ])
-    .then(([doc, rosterDoc]) => {
+    .then(([primaryDoc, otherDocs]) => {
+      const profiles = [];
+      if (primaryDoc.exists) profiles.push(Object.assign({ id: primaryDoc.id }, primaryDoc.data()));
+      otherDocs.forEach((d) => profiles.push(Object.assign({ id: d.id }, d.data())));
+      if (!profiles.length) {
+        loginError.textContent = "Không tìm thấy dữ liệu học sinh cho tài khoản này.";
+        auth.signOut();
+        return;
+      }
+      const chosen =
+        profiles.find((p) => p.id === wantedProfileId) ||
+        profiles.find((p) => p.classId === currentClassId) ||
+        profiles[0];
+      setupClassSwitcher(profiles, chosen.id);
+      return showDashboardFor(user, chosen);
+    })
+    .catch((err) => console.error("loadDashboard lỗi:", err));
+}
+
+function setupClassSwitcher(profiles, activeId) {
+  const select = document.getElementById("dash-class-switch");
+  const label = document.getElementById("dash-class");
+  select.innerHTML = "";
+  profiles.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = (CLASS_LIST.find((c) => c.id === p.classId) || {}).name || p.classId;
+    select.appendChild(opt);
+  });
+  select.value = activeId;
+  select.hidden = profiles.length < 2;
+  label.hidden = profiles.length >= 2;
+}
+
+document.getElementById("dash-class-switch").addEventListener("change", (e) => {
+  const user = auth.currentUser;
+  if (user) loadDashboard(user, e.target.value);
+});
+
+function showDashboardFor(user, rosterData) {
+  return db
+    .collection("students")
+    .doc(rosterData.id)
+    .get()
+    .then((doc) => {
       if (!doc.exists) {
         loginError.textContent = "Không tìm thấy dữ liệu học sinh cho tài khoản này.";
         auth.signOut();
         return;
       }
       const d = doc.data();
-      const rosterData = rosterDoc.exists ? rosterDoc.data() : {};
+      activeProfileId = rosterData.id;
       myClassId = d.classId;
       myClassRole = rosterData.classRole || null;
       myFullName = d.fullName;
@@ -155,23 +204,23 @@ function loadDashboard(user) {
       loadDashAvatar(user.uid);
 
       // mỗi lần đăng nhập: về tab mặc định, nhật ký 3 ngày, bảng xếp hạng thu gọn
-      dashUid = user.uid;
+      dashUid = activeProfileId;
       journalDaysShown = JOURNAL_DAYS_STEP;
       dashLatest = { diem: "", nhanxet: "", nhatky: "" };
       dashActiveTab = null;
       setupJournalWritePanel();
       loadClassJournal(d.classId);
-      setupRenLuyenGrader(user.uid);
+      setupRenLuyenGrader(user.uid, d.classId);
 
-      if (d.classId === RENLUYEN_CLASS_ID) {
+      if (isRenLuyenClass(d.classId)) {
         document.getElementById("renluyen-student-card").hidden = false;
-        loadRenLuyenStudentCard(user.uid);
-        loadRenLuyenLeaderboard(user.uid, d.fullName);
+        loadRenLuyenStudentCard(activeProfileId, d.classId);
+        loadRenLuyenLeaderboard(activeProfileId, d.classId, d.fullName);
       } else {
         document.getElementById("renluyen-student-card").hidden = true;
         document.getElementById("renluyen-leaderboard").hidden = true;
       }
-      document.querySelector('#dash-tabs [data-tab="renluyen"]').hidden = d.classId !== RENLUYEN_CLASS_ID;
+      document.querySelector('#dash-tabs [data-tab="renluyen"]').hidden = !isRenLuyenClass(d.classId);
       // tên tab: chỉ lớp 10C5 ghi "GVCN", các lớp khác ghi "GV"
       document.querySelector('#dash-tabs [data-tab="nhanxet"]').firstChild.nodeValue = d.classId === RENLUYEN_CLASS_ID ? "Nhận xét của GVCN" : "Nhận xét của GV";
 
@@ -215,7 +264,7 @@ function loadDashboard(user) {
       viewClasses.hidden = true;
       viewRoster.hidden = true;
       viewDashboard.hidden = false;
-      showDashTab(d.classId === RENLUYEN_CLASS_ID ? "renluyen" : "diem");
+      showDashTab(isRenLuyenClass(d.classId) ? "renluyen" : "diem");
     });
 }
 
@@ -700,28 +749,33 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// ---------- Chấm điểm rèn luyện (chỉ hiện cho người được giao quyền, lớp 10C5) ----------
-function setupRenLuyenGrader(uid) {
+// ---------- Chấm điểm rèn luyện (chỉ hiện cho người được giao quyền, theo từng lớp) ----------
+function setupRenLuyenGrader(uid, classId) {
   const section = document.getElementById("renluyen-grader-section");
-  getRenLuyenConfig().then((cfg) => {
+  if (!isRenLuyenClass(classId)) {
+    section.hidden = true;
+    return;
+  }
+  getRenLuyenConfig(classId).then((cfg) => {
     const isGrader = cfg.nguoiDuocCham.indexOf(uid) !== -1;
     section.hidden = !isGrader;
     if (!isGrader) return;
+    document.getElementById("renluyen-grader-class").textContent = (CLASS_LIST.find((c) => c.id === classId) || {}).name || classId;
     document.getElementById("renluyen-grader-hocky").textContent = cfg.hocKyHienTai || "(chưa đặt)";
     if (!cfg.hocKyHienTai) {
       document.getElementById("renluyen-grader-list").innerHTML =
         '<p class="empty-note">Thầy chưa đặt "Học kỳ hiện tại" trong mục Cài đặt điểm rèn luyện, em báo Thầy nhé.</p>';
       return;
     }
-    loadRenLuyenGraderList(cfg, uid);
+    loadRenLuyenGraderList(cfg, uid, classId);
   });
 }
 
-function loadRenLuyenGraderList(cfg, myUid) {
+function loadRenLuyenGraderList(cfg, myUid, classId) {
   const listEl = document.getElementById("renluyen-grader-list");
   listEl.innerHTML = "Đang tải...";
   db.collection("roster")
-    .where("classId", "==", RENLUYEN_CLASS_ID)
+    .where("classId", "==", classId)
     .orderBy("order")
     .get()
     .then((rosterSnap) => {
@@ -729,13 +783,13 @@ function loadRenLuyenGraderList(cfg, myUid) {
       return Promise.all(students.map((s) => db.collection("renluyenTong").doc(s.uid).get())).then((tongDocs) => {
         listEl.innerHTML = "";
         if (!students.length) {
-          listEl.innerHTML = '<p class="empty-note">Lớp 10C5 chưa có học sinh nào.</p>';
+          listEl.innerHTML = '<p class="empty-note">Lớp này chưa có học sinh nào.</p>';
           return;
         }
         students.forEach((s, idx) => {
           const tong = tongDocs[idx].exists ? tongDocs[idx].data() || {} : {};
           const diem = typeof tong[cfg.hocKyHienTai] === "number" ? tong[cfg.hocKyHienTai] : 0;
-          listEl.appendChild(renderRenLuyenGraderRow(s, diem, cfg, myUid));
+          listEl.appendChild(renderRenLuyenGraderRow(s, diem, cfg, myUid, classId));
         });
       });
     })
@@ -745,7 +799,7 @@ function loadRenLuyenGraderList(cfg, myUid) {
     });
 }
 
-function renderRenLuyenGraderRow(student, diem, cfg, myUid) {
+function renderRenLuyenGraderRow(student, diem, cfg, myUid, classId) {
   const row = document.createElement("div");
   row.style.cssText = "border:1px solid var(--card-border);border-radius:10px;padding:12px 14px;margin-bottom:10px;";
   const diemColor = diem > 0 ? "var(--chalk)" : diem < 0 ? "var(--pen-red)" : "var(--muted)";
@@ -830,7 +884,7 @@ function renderRenLuyenGraderRow(student, diem, cfg, myUid) {
     saveBtn.disabled = true;
     themLuotChamRenLuyen(student.uid, diemVal, lyDo, cfg.hocKyHienTai, myUid, myFullName)
       .then(() => {
-        loadRenLuyenGraderList(cfg, myUid);
+        loadRenLuyenGraderList(cfg, myUid, classId);
       })
       .catch((err) => {
         console.error(err);
@@ -843,8 +897,8 @@ function renderRenLuyenGraderRow(student, diem, cfg, myUid) {
 }
 
 // ---------- Thẻ "Điểm rèn luyện" nổi bật đầu trang (chỉ học sinh 10C5) ----------
-function loadRenLuyenStudentCard(uid) {
-  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(uid).get()])
+function loadRenLuyenStudentCard(profileId, classId) {
+  Promise.all([getRenLuyenConfig(classId), db.collection("renluyenTong").doc(profileId).get()])
     .then(([cfg, tongDoc]) => {
       const tong = tongDoc.exists ? tongDoc.data() || {} : {};
       const hocKy = cfg.hocKyHienTai || "";
@@ -869,17 +923,17 @@ document.getElementById("renluyen-detail-hocky-select").addEventListener("change
   const user = auth.currentUser;
   if (!user) return;
   updateRenLuyenDetailDiem(e.target.value);
-  loadRenLuyenDetailHistory(user.uid, e.target.value);
+  loadRenLuyenDetailHistory(activeProfileId, e.target.value);
 });
 
 let renLuyenDetailTongCache = {};
 
 function openRenLuyenDetailModal() {
   const user = auth.currentUser;
-  if (!user || !myClassId || myClassId !== RENLUYEN_CLASS_ID) return;
+  if (!user || !myClassId || !isRenLuyenClass(myClassId) || !activeProfileId) return;
   document.getElementById("renluyen-detail-modal").classList.add("open");
 
-  Promise.all([getRenLuyenConfig(), db.collection("renluyenTong").doc(user.uid).get()])
+  Promise.all([getRenLuyenConfig(myClassId), db.collection("renluyenTong").doc(activeProfileId).get()])
     .then(([cfg, tongDoc]) => {
       renLuyenDetailTongCache = tongDoc.exists ? tongDoc.data() || {} : {};
       const select = document.getElementById("renluyen-detail-hocky-select");
@@ -905,7 +959,7 @@ function openRenLuyenDetailModal() {
       const defaultHocKy = cfg.hocKyHienTai && sorted.indexOf(cfg.hocKyHienTai) !== -1 ? cfg.hocKyHienTai : sorted[0];
       select.value = defaultHocKy;
       updateRenLuyenDetailDiem(defaultHocKy);
-      loadRenLuyenDetailHistory(user.uid, defaultHocKy);
+      loadRenLuyenDetailHistory(activeProfileId, defaultHocKy);
     })
     .catch((err) => {
       console.error("Không tải được chi tiết điểm rèn luyện:", err);
@@ -989,10 +1043,10 @@ function renderRenLuyenDetailHistory(docs) {
 
 renderClassGrid();
 
-// ---------- Bảng xếp hạng lớp 10C5 (chỉ học sinh 10C5) ----------
-// Chỉ đọc 2 tài liệu do Cloud Function ghi: leaderboard/10C5_<học kỳ> (top 10, không lý do) và
-// renluyenHang/<uid> (hạng của riêng em). KHÔNG đọc điểm của bạn khác.
-function loadRenLuyenLeaderboard(uid, myName) {
+// ---------- Bảng xếp hạng lớp có rèn luyện (chỉ học sinh của lớp đó) ----------
+// Chỉ đọc 2 tài liệu do Cloud Function ghi: leaderboard/<lớp>_<học kỳ> (top 10, không lý do) và
+// renluyenHang/<id hồ sơ> (hạng của riêng em). KHÔNG đọc điểm của bạn khác.
+function loadRenLuyenLeaderboard(profileId, classId, myName) {
   const box = document.getElementById("renluyen-leaderboard");
   const meEl = document.getElementById("renluyen-lb-me");
   const body = document.getElementById("renluyen-lb-body");
@@ -1014,15 +1068,15 @@ function loadRenLuyenLeaderboard(uid, myName) {
     emptyEl.hidden = false;
   };
 
-  getRenLuyenConfig()
+  getRenLuyenConfig(classId)
     .then((cfg) => {
       if (!cfg.hocKyHienTai) {
         showEmpty("Chưa có học kỳ hiện tại nên chưa có bảng xếp hạng.");
         return;
       }
       return Promise.all([
-        db.collection("leaderboard").doc("10C5_" + cfg.hocKyHienTai).get(),
-        db.collection("renluyenHang").doc(uid).get(),
+        db.collection("leaderboard").doc(renLuyenLeaderboardDocId(classId, cfg.hocKyHienTai)).get(),
+        db.collection("renluyenHang").doc(profileId).get(),
       ]).then(([lbDoc, hangDoc]) => {
         if (!lbDoc.exists) {
           showEmpty("Bảng xếp hạng chưa có dữ liệu.");

@@ -11,8 +11,8 @@
 //   createTuitionPayment   (callable)  — phụ huynh bấm "Đóng học phí": tạo/tái dùng
 //                          link thanh toán payOS cho 1 khoản học phí
 //   capNhatXepHangRenLuyen      (firestore) — mỗi khi có lượt chấm điểm rèn luyện được thêm/sửa/xoá,
-//   capNhatXepHangKhiDoiHocKy   (firestore)   hoặc khi đổi học kỳ hiện tại / capNhatXepHangKhiDoiDanhSach (khi thêm-xoá-đổi tên học sinh 10C5): tính lại bảng xếp hạng lớp 10C5
-//                          -> leaderboard/10C5_<học kỳ> (top 10 công khai) + renluyenHang/{uid} (hạng riêng)
+//   capNhatXepHangKhiDoiHocKy   (firestore)   hoặc khi đổi học kỳ hiện tại / capNhatXepHangKhiDoiDanhSach (khi thêm-xoá-đổi tên học sinh): tính lại bảng xếp hạng từng lớp có rèn luyện
+//                          -> leaderboard/<lớp>_<học kỳ> (top 10 công khai) + renluyenHang/{id hồ sơ} (hạng riêng)
 //
 // Trước khi deploy cần khai báo 3 secret lấy từ trang quản trị payOS:
 //   firebase functions:secrets:set PAYOS_CLIENT_ID
@@ -434,24 +434,39 @@ exports.payosWebhook = onRequest(
 );
 
 // ---------------------------------------------------------
-// Bảng xếp hạng điểm rèn luyện lớp 10C5
+// Bảng xếp hạng điểm rèn luyện (mỗi lớp trong RENLUYEN_CLASS_IDS xếp hạng riêng)
 // ---------------------------------------------------------
 // Học sinh KHÔNG được đọc điểm của nhau, nên bảng xếp hạng được Cloud Function tính bằng Admin SDK
-// rồi ghi ra 2 nơi mà firestore.rules cho học sinh 10C5 đọc:
-//   leaderboard/10C5_<học kỳ>  : { hocKy, siSo, top:[{hang,ten,diem}], capNhatLuc }  (mọi em hạng <= 10)
-//   renluyenHang/{uid}         : { hocKy, hang, diem, siSo, capNhatLuc }            (chỉ chủ + admin đọc)
-// PHẢI khớp RENLUYEN_CLASS_ID trong renluyen.js / is10C5() trong firestore.rules.
-const RENLUYEN_CLASS_ID = "10c-lqd";
+// rồi ghi ra 2 nơi mà firestore.rules cho học sinh của lớp đó đọc:
+//   leaderboard/10C5_<học kỳ> (lớp 10C5) hoặc leaderboard/<classId>_<học kỳ> (lớp khác):
+//                                { classId, hocKy, siSo, top:[{hang,ten,diem}], capNhatLuc }  (mọi em hạng <= 10)
+//   renluyenHang/{id hồ sơ}    : { hocKy, hang, diem, siSo, capNhatLuc }            (chỉ chủ + admin đọc)
+// "id hồ sơ" là uid đăng nhập (hồ sơ gốc) hoặc "uid~classId" (hồ sơ lớp thứ hai trở đi của cùng tài khoản).
+// PHẢI khớp RENLUYEN_CLASS_IDS trong renluyen.js / renLuyenClasses() trong firestore.rules.
+const RENLUYEN_CLASS_IDS = ["10c-lqd", "tho-2k9-minhan"];
+const RENLUYEN_ROOT_CLASS_ID = "10c-lqd"; // lớp dùng config/renluyen và leaderboard/10C5_<học kỳ> như trước
 
-async function rebuildRenLuyenLeaderboard() {
-  const cfgSnap = await db.collection("config").doc("renluyen").get();
+function renLuyenConfigDocId(classId) {
+  return classId === RENLUYEN_ROOT_CLASS_ID ? "renluyen" : `renluyen_${classId}`;
+}
+
+// Ngược lại: từ id tài liệu config -> classId (hoặc null nếu không phải config rèn luyện)
+function classIdOfRenLuyenConfig(docId) {
+  if (docId === "renluyen") return RENLUYEN_ROOT_CLASS_ID;
+  if (docId.startsWith("renluyen_")) return docId.slice("renluyen_".length);
+  return null;
+}
+
+async function rebuildRenLuyenLeaderboard(classId) {
+  if (RENLUYEN_CLASS_IDS.indexOf(classId) === -1) return;
+  const cfgSnap = await db.collection("config").doc(renLuyenConfigDocId(classId)).get();
   const hocKy = cfgSnap.exists ? cfgSnap.data().hocKyHienTai : "";
   if (!hocKy || typeof hocKy !== "string") {
-    logger.info("rebuildRenLuyenLeaderboard: chưa đặt học kỳ hiện tại, bỏ qua");
+    logger.info(`rebuildRenLuyenLeaderboard(${classId}): chưa đặt học kỳ hiện tại, bỏ qua`);
     return;
   }
 
-  const rosterSnap = await db.collection("roster").where("classId", "==", RENLUYEN_CLASS_ID).get();
+  const rosterSnap = await db.collection("roster").where("classId", "==", classId).get();
   const students = await Promise.all(
     rosterSnap.docs.map(async (r) => {
       const entries = await db
@@ -471,7 +486,9 @@ async function rebuildRenLuyenLeaderboard() {
   const ranked = xepHang(students);
   const now = admin.firestore.FieldValue.serverTimestamp();
   const batch = db.batch();
-  batch.set(db.collection("leaderboard").doc(`10C5_${hocKy}`), {
+  const lbDocId = `${classId === RENLUYEN_ROOT_CLASS_ID ? "10C5" : classId}_${hocKy}`;
+  batch.set(db.collection("leaderboard").doc(lbDocId), {
+    classId,
     hocKy,
     siSo: ranked.length,
     top: layTop(ranked),
@@ -487,13 +504,16 @@ async function rebuildRenLuyenLeaderboard() {
     });
   });
   await batch.commit();
-  logger.info(`rebuildRenLuyenLeaderboard: ${hocKy} — đã xếp hạng ${ranked.length} học sinh`);
+  logger.info(`rebuildRenLuyenLeaderboard(${classId}): ${hocKy} — đã xếp hạng ${ranked.length} học sinh`);
 }
 
 exports.capNhatXepHangRenLuyen = onDocumentWritten(
   { region: REGION, document: "students/{studentId}/renluyen/{entryId}" },
-  async () => {
-    await rebuildRenLuyenLeaderboard();
+  async (event) => {
+    // lượt chấm thuộc lớp nào: tra roster của hồ sơ (id hồ sơ gốc hoặc "uid~classId")
+    const rosterSnap = await db.collection("roster").doc(event.params.studentId).get();
+    if (!rosterSnap.exists) return;
+    await rebuildRenLuyenLeaderboard(rosterSnap.data().classId);
   }
 );
 
@@ -503,26 +523,40 @@ exports.capNhatXepHangKhiDoiHocKy = onDocumentWritten(
     const before = event.data.before.exists ? event.data.before.data().hocKyHienTai : null;
     const after = event.data.after.exists ? event.data.after.data().hocKyHienTai : null;
     if (before === after) return; // chỉ đổi nút chấm nhanh / người được giao quyền — không cần tính lại
-    await rebuildRenLuyenLeaderboard();
+    await rebuildRenLuyenLeaderboard(RENLUYEN_ROOT_CLASS_ID);
   }
 );
 
-// Thêm / xoá / đổi lớp / đổi tên học sinh 10C5 cũng làm thay đổi bảng xếp hạng (sĩ số, danh sách top),
+// Giống hàm trên nhưng cho config của các lớp khác 10C5 (config/renluyen_<classId>)
+exports.capNhatXepHangKhiDoiHocKyLopKhac = onDocumentWritten(
+  { region: REGION, document: "config/{configId}" },
+  async (event) => {
+    const classId = classIdOfRenLuyenConfig(event.params.configId);
+    if (!classId || classId === RENLUYEN_ROOT_CLASS_ID) return;
+    const before = event.data.before.exists ? event.data.before.data().hocKyHienTai : null;
+    const after = event.data.after.exists ? event.data.after.data().hocKyHienTai : null;
+    if (before === after) return;
+    await rebuildRenLuyenLeaderboard(classId);
+  }
+);
+
+// Thêm / xoá / đổi lớp / đổi tên học sinh của lớp có rèn luyện cũng làm thay đổi bảng xếp hạng (sĩ số, danh sách top),
 // dù không có lượt chấm điểm nào mới — nên tính lại ở đây. Đổi thứ tự (order) hay field khác thì bỏ qua.
 exports.capNhatXepHangKhiDoiDanhSach = onDocumentWritten(
   { region: REGION, document: "roster/{studentId}" },
   async (event) => {
     const before = event.data.before.exists ? event.data.before.data() : null;
     const after = event.data.after.exists ? event.data.after.data() : null;
-    const truoc = before && before.classId === RENLUYEN_CLASS_ID;
-    const sau = after && after.classId === RENLUYEN_CLASS_ID;
-    if (!truoc && !sau) return; // không liên quan lớp 10C5
-    if (truoc && sau && before.fullName === after.fullName) return; // chỉ đổi field khác
-    if (truoc && !sau) {
-      // Học sinh bị xoá / chuyển khỏi 10C5: bỏ luôn hạng riêng còn sót lại
+    const lopTruoc = before && RENLUYEN_CLASS_IDS.indexOf(before.classId) !== -1 ? before.classId : null;
+    const lopSau = after && RENLUYEN_CLASS_IDS.indexOf(after.classId) !== -1 ? after.classId : null;
+    if (!lopTruoc && !lopSau) return; // không liên quan lớp có rèn luyện
+    if (lopTruoc && lopTruoc === lopSau && before.fullName === after.fullName) return; // chỉ đổi field khác
+    if (lopTruoc && lopTruoc !== lopSau) {
+      // Học sinh bị xoá / chuyển khỏi lớp: bỏ luôn hạng riêng còn sót lại
       await db.collection("renluyenHang").doc(event.params.studentId).delete();
     }
-    await rebuildRenLuyenLeaderboard();
+    const lopCanTinh = new Set([lopTruoc, lopSau].filter(Boolean));
+    for (const classId of lopCanTinh) await rebuildRenLuyenLeaderboard(classId);
   }
 );
 

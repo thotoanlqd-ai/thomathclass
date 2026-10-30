@@ -79,6 +79,7 @@
             <div>
               <h2 id="dash-name">—</h2>
               <p class="cls" id="dash-class">—</p>
+              <select id="dash-class-switch" class="cls" hidden aria-label="Chọn lớp"></select>
               <label class="avatar-upload-btn dash-avatar-link">
                 Đổi ảnh đại diện
                 <input type="file" accept="image/*" id="dash-avatar-input" hidden />
@@ -122,7 +123,7 @@
           <p class="empty-note" id="renluyen-lb-empty" hidden>Bảng xếp hạng chưa có dữ liệu.</p>
         </div>
         <div class="dash-section" id="renluyen-grader-section" hidden>
-          <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;"><strong>Chấm điểm rèn luyện cho lớp 10C5.</strong> Học kỳ hiện tại: <span id="renluyen-grader-hocky" class="mono"></span>. Em chỉ tạo được lượt chấm mới, không xem được lịch sử chi tiết hay huỷ lượt chấm của bạn khác.</p>
+          <p style="color:var(--muted);font-size:0.85rem;margin:-8px 0 14px;"><strong>Chấm điểm rèn luyện cho lớp <span id="renluyen-grader-class"></span>.</strong> Học kỳ hiện tại: <span id="renluyen-grader-hocky" class="mono"></span>. Em chỉ tạo được lượt chấm mới, không xem được lịch sử chi tiết hay huỷ lượt chấm của bạn khác.</p>
           <div id="renluyen-grader-list"></div>
         </div>
         </div>

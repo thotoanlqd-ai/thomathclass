@@ -21,19 +21,53 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
     }
 
-    // ---- Điểm rèn luyện (chỉ áp dụng thực tế cho lớp 10C5, classId "10c-lqd") ----
-
-    // Người được giao quyền chấm điểm rèn luyện: uid có trong config/renluyen.nguoiDuocCham.
-    function isRenLuyenGrader() {
+    // ---- Nhiều lớp / một tài khoản ----
+    // Hồ sơ gốc của học sinh là roster/{uid}, students/{uid}. Khi học thêm lớp khác bằng CÙNG tài khoản,
+    // admin tạo hồ sơ phụ roster/{uid}~{classId}, students/{uid}~{classId} (điểm, nhận xét, rèn luyện riêng từng lớp).
+    // studentId trong các collection dưới đây có thể là uid hoặc "{uid}~{classId}".
+    function isOwnerOf(studentId) {
       return request.auth != null &&
-             exists(/databases/$(database)/documents/config/renluyen) &&
-             request.auth.uid in get(/databases/$(database)/documents/config/renluyen).data.nguoiDuocCham;
+             (request.auth.uid == studentId || studentId.matches(request.auth.uid + '~.*'));
     }
 
-    // Kiểm tra uid có phải học sinh lớp 10C5 (dựa vào roster) không.
-    function is10C5(uid) {
-      return exists(/databases/$(database)/documents/roster/$(uid)) &&
-             get(/databases/$(database)/documents/roster/$(uid)).data.classId == "10c-lqd";
+    // Người đang đăng nhập có thuộc lớp classId không (hồ sơ gốc hoặc hồ sơ phụ).
+    function isMemberOfClass(classId) {
+      return request.auth != null &&
+             ((exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId) ||
+              exists(/databases/$(database)/documents/roster/$(request.auth.uid + '~' + classId)));
+    }
+
+    // ---- Điểm rèn luyện (áp dụng cho các lớp trong renLuyenClasses(), mỗi lớp tách riêng) ----
+
+    // PHẢI khớp RENLUYEN_CLASS_IDS trong renluyen.js và functions/index.js.
+    function renLuyenClasses() {
+      return ["10c-lqd", "tho-2k9-minhan"];
+    }
+
+    // Lớp 10C5 dùng config/renluyen; các lớp khác dùng config/renluyen_{classId}.
+    function renLuyenConfigPath(classId) {
+      return /databases/$(database)/documents/config/$(classId == "10c-lqd" ? "renluyen" : "renluyen_" + classId);
+    }
+
+    // Lớp (có rèn luyện) của hồ sơ học sinh studentId, dựa vào roster.
+    function renLuyenClassOf(studentId) {
+      return get(/databases/$(database)/documents/roster/$(studentId)).data.classId;
+    }
+
+    // Kiểm tra studentId (uid hoặc id hồ sơ phụ) có phải học sinh của 1 lớp có rèn luyện không.
+    function isRenLuyenStudent(studentId) {
+      return exists(/databases/$(database)/documents/roster/$(studentId)) &&
+             renLuyenClassOf(studentId) in renLuyenClasses();
+    }
+
+    // Người được giao quyền chấm điểm rèn luyện CHO LỚP của studentId:
+    // uid đăng nhập có trong nguoiDuocCham của config lớp đó.
+    function isRenLuyenGraderFor(studentId) {
+      return request.auth != null &&
+             isRenLuyenStudent(studentId) &&
+             exists(renLuyenConfigPath(renLuyenClassOf(studentId))) &&
+             request.auth.uid in get(renLuyenConfigPath(renLuyenClassOf(studentId))).data.nguoiDuocCham;
     }
 
     // Dữ liệu hợp lệ cho 1 lượt chấm điểm rèn luyện mới.
@@ -52,9 +86,11 @@ service cloud.firestore {
     // và đúng classId của roster khớp classId truyền vào.
     function canWriteJournalFor(classId) {
       return request.auth != null &&
-             exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classRole in journalRoles() &&
-             get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId;
+             ((exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classRole in journalRoles() &&
+               get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId) ||
+              (exists(/databases/$(database)/documents/roster/$(request.auth.uid + '~' + classId)) &&
+               get(/databases/$(database)/documents/roster/$(request.auth.uid + '~' + classId)).data.get('classRole', '') in journalRoles()));
     }
 
     // roster: danh sách công khai (chỉ tên + lớp), ai cũng xem được
@@ -68,8 +104,7 @@ service cloud.firestore {
     // chỉ chính học sinh đó (đã đăng nhập đúng tài khoản) hoặc giáo viên mới đọc được
     // chỉ giáo viên mới được ghi/sửa
     match /students/{studentId} {
-      allow read: if request.auth != null &&
-                     (request.auth.uid == studentId || request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72");
+      allow read: if isOwnerOf(studentId) || isAdmin();
       allow write: if request.auth != null && request.auth.uid == "cbWUWVPZ8Fgni1gQjbz7ycJvfL72";
     }
 
@@ -136,9 +171,7 @@ service cloud.firestore {
     // Sửa/xoá: admin sửa/xoá được mọi bài; học sinh chỉ sửa/xoá được đúng bài do mình viết.
     match /classJournal/{entryId} {
       allow read: if request.auth != null &&
-                     (isAdmin() ||
-                      (exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == resource.data.classId));
+                     (isAdmin() || isMemberOfClass(resource.data.classId));
       allow create: if isAdmin() ||
                        (canWriteJournalFor(request.resource.data.classId) &&
                         request.resource.data.authorUid == request.auth.uid);
@@ -164,13 +197,14 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // config/renluyen: học kỳ hiện tại + danh sách uid được giao quyền chấm điểm rèn luyện 10C5.
+    // config/renluyen (lớp 10C5) và config/renluyen_{classId} (các lớp khác): học kỳ hiện tại +
+    // danh sách uid ĐĂNG NHẬP được giao quyền chấm điểm rèn luyện của lớp đó.
     // Đọc: bất kỳ ai đã đăng nhập (chỉ chứa 1 chuỗi học kỳ + danh sách uid, không nhạy cảm) —
     // học sinh cần đọc hocKyHienTai để hiện đúng học kỳ mặc định trên thẻ điểm rèn luyện của mình.
     // Ghi: chỉ admin (thêm/bớt người chấm, đổi học kỳ hiện tại).
-    match /config/renluyen {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
+    match /config/{configId} {
+      allow read: if request.auth != null && configId.matches('renluyen.*');
+      allow write: if isAdmin() && configId.matches('renluyen.*');
     }
 
     // students/{studentId}/renluyen/{entryId}: từng lượt chấm điểm rèn luyện.
@@ -179,10 +213,9 @@ service cloud.firestore {
     // và phải tự ghi đúng nguoiChamUid của mình (không giả mạo người khác).
     // Sửa (huỷ lượt chấm nhầm bằng cách đánh dấu huy=true): chỉ admin. Không ai xoá hẳn được.
     match /students/{studentId}/renluyen/{entryId} {
-      allow read: if request.auth != null &&
-                     (request.auth.uid == studentId || isAdmin());
+      allow read: if isOwnerOf(studentId) || isAdmin();
       allow create: if isAdmin() ||
-                       (isRenLuyenGrader() && is10C5(studentId) && validRenLuyenEntry());
+                       (isRenLuyenGraderFor(studentId) && validRenLuyenEntry());
       allow update: if isAdmin();
       allow delete: if false;
     }
@@ -194,33 +227,30 @@ service cloud.firestore {
     // Ghi: admin (kể cả điều chỉnh khi huỷ lượt chấm), hoặc người được giao quyền chấm cho
     // đúng học sinh 10C5 (khi họ tạo lượt chấm mới, cùng lúc cộng/trừ vào tổng bằng transaction).
     match /renluyenTong/{studentId} {
-      allow read: if request.auth != null &&
-                     (request.auth.uid == studentId || isAdmin() || isRenLuyenGrader());
-      allow write: if isAdmin() || (isRenLuyenGrader() && is10C5(studentId));
+      allow read: if isOwnerOf(studentId) || isAdmin() || isRenLuyenGraderFor(studentId);
+      allow write: if isAdmin() || isRenLuyenGraderFor(studentId);
     }
 
     // leaderboard/10C5_<học kỳ>: bảng xếp hạng công khai TRONG LỚP — chỉ chứa
     // {hocKy, siSo, top:[{hang,ten,diem}]} (mọi em hạng <= 10, KHÔNG có lý do, KHÔNG có uid).
     // Đọc: học sinh 10C5 đã đăng nhập, hoặc admin. Ghi: chỉ Cloud Function (Admin SDK bỏ qua rules).
     match /leaderboard/{docId} {
-      allow read: if request.auth != null && (isAdmin() || is10C5(request.auth.uid));
+      allow read: if request.auth != null &&
+                     (isAdmin() || isMemberOfClass(resource.data.get('classId', '10c-lqd')));
       allow write: if false;
     }
 
     // classStats/{classId}: thống kê điểm kiểm tra cả lớp (TB, cao nhất, thấp nhất, số lượng theo khoảng điểm),
     // không chứa điểm từng em. Đọc: học sinh đúng lớp đó (theo roster) hoặc admin. Ghi: chỉ Cloud Function.
     match /classStats/{classId} {
-      allow read: if request.auth != null &&
-                     (isAdmin() ||
-                      (exists(/databases/$(database)/documents/roster/$(request.auth.uid)) &&
-                       get(/databases/$(database)/documents/roster/$(request.auth.uid)).data.classId == classId));
+      allow read: if request.auth != null && (isAdmin() || isMemberOfClass(classId));
       allow write: if false;
     }
 
     // renluyenHang/{studentId}: hạng + điểm học kỳ hiện tại của RIÊNG từng học sinh
     // ({hocKy, hang, diem, siSo}). Đọc: chính học sinh đó hoặc admin. Ghi: chỉ Cloud Function.
     match /renluyenHang/{studentId} {
-      allow read: if request.auth != null && (request.auth.uid == studentId || isAdmin());
+      allow read: if isOwnerOf(studentId) || isAdmin();
       allow write: if false;
     }
   }

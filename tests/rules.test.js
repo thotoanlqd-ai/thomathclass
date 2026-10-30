@@ -37,6 +37,22 @@ before(async () => {
     await db.doc(`leaderboard/10C5_${HK}`).set({ hocKy: HK, siSo: 3, top: [{ hang: 1, ten: "Thử An", diem: 5 }] });
     await db.doc("renluyenHang/hsA").set({ hocKy: HK, hang: 1, diem: 5, siSo: 3 });
     await db.doc("renluyenHang/hsB").set({ hocKy: HK, hang: 3, diem: -2, siSo: 3 });
+
+    // Lớp thứ hai có rèn luyện (tho-2k9-minhan): hsA, hsB học thêm bằng CÙNG tài khoản -> hồ sơ phụ "uid~classId".
+    // hsB là người chấm của lớp này (nhưng KHÔNG được chấm ở 10C5).
+    await db.doc("config/renluyen_tho-2k9-minhan").set({ hocKyHienTai: HK, nguoiDuocCham: ["hsB"], nutNhanh: [] });
+    for (const [uid, fullName] of [["hsA", "Thử An"], ["hsB", "Thử Bình"]]) {
+      const pid = `${uid}~tho-2k9-minhan`;
+      await db.doc(`roster/${pid}`).set({ fullName, classId: "tho-2k9-minhan", authUid: uid, code: uid, order: 1 });
+      await db.doc(`students/${pid}`).set({ fullName, classId: "tho-2k9-minhan", scores: [], comments: [] });
+    }
+    await db.doc("students/hsA~tho-2k9-minhan/renluyen/e1").set({ diem: 3, lyDo: "Bí mật Minh An của A", hocKy: HK, nguoiChamTen: "Giáo viên", huy: false });
+    await db.doc("students/hsB~tho-2k9-minhan/renluyen/e1").set({ diem: 1, lyDo: "Bí mật Minh An của B", hocKy: HK, nguoiChamTen: "Giáo viên", huy: false });
+    await db.doc("renluyenTong/hsA~tho-2k9-minhan").set({ [HK]: 3 });
+    await db.doc("renluyenTong/hsB~tho-2k9-minhan").set({ [HK]: 1 });
+    await db.doc("classStats/tho-2k9-minhan").set({ tests: [] });
+    await db.doc(`leaderboard/tho-2k9-minhan_${HK}`).set({ classId: "tho-2k9-minhan", hocKy: HK, siSo: 2, top: [{ hang: 1, ten: "Thử An", diem: 3 }] });
+    await db.doc("renluyenHang/hsA~tho-2k9-minhan").set({ hocKy: HK, hang: 1, diem: 3, siSo: 2 });
   });
 });
 
@@ -94,4 +110,46 @@ test("admin đọc được tất cả, chấm điểm được; vẫn không gh
     admin.doc("students/hsC/renluyen/e9").set({ diem: 1, lyDo: "Phát biểu", hocKy: HK, nguoiChamUid: ADMIN_UID, huy: false })
   );
   await assertFails(admin.doc("renluyenHang/hsC").set({ hocKy: HK, hang: 1, diem: 0, siSo: 3 }));
+});
+
+// ---------- Một tài khoản học nhiều lớp (hồ sơ phụ "uid~classId") ----------
+const M = "tho-2k9-minhan";
+
+test("hsA đọc được dữ liệu lớp thứ hai của CHÍNH MÌNH, không đọc được của hsB", async () => {
+  await assertSucceeds(as("hsA").doc(`students/hsA~${M}`).get());
+  await assertSucceeds(as("hsA").doc(`students/hsA~${M}/renluyen/e1`).get());
+  await assertSucceeds(as("hsA").doc(`renluyenTong/hsA~${M}`).get());
+  await assertSucceeds(as("hsA").doc(`renluyenHang/hsA~${M}`).get());
+  await assertFails(as("hsA").doc(`students/hsB~${M}`).get());
+  await assertFails(as("hsA").doc(`students/hsB~${M}/renluyen/e1`).get());
+  await assertFails(as("hsA").doc(`renluyenTong/hsB~${M}`).get());
+  await assertFails(as("hsA").doc(`renluyenHang/hsB~${M}`).get());
+});
+
+test("bảng xếp hạng + thống kê của lớp thứ hai: chỉ thành viên lớp đó đọc được", async () => {
+  await assertSucceeds(as("hsA").doc(`leaderboard/${M}_${HK}`).get());
+  await assertSucceeds(as("hsA").doc(`classStats/${M}`).get());
+  await assertFails(as("hsC").doc(`leaderboard/${M}_${HK}`).get()); // hsC chỉ học 10C5
+  await assertFails(as("hsC").doc(`classStats/${M}`).get());
+  await assertFails(as("hsOther").doc(`leaderboard/${M}_${HK}`).get());
+  // học sinh lớp thứ hai vẫn đọc được bảng xếp hạng 10C5 của mình
+  await assertSucceeds(as("hsA").doc(`leaderboard/10C5_${HK}`).get());
+});
+
+test("người chấm của lớp thứ hai chỉ chấm được học sinh lớp đó, không chấm được 10C5", async () => {
+  const entry = { diem: 1, lyDo: "Phát biểu", hocKy: HK, nguoiChamUid: "hsB", huy: false };
+  await assertSucceeds(as("hsB").doc(`students/hsA~${M}/renluyen/g1`).set(entry));
+  await assertSucceeds(as("hsB").doc(`renluyenTong/hsA~${M}`).set({ [HK]: 4 }, { merge: true }));
+  await assertSucceeds(as("hsB").doc(`renluyenTong/hsA~${M}`).get());
+  await assertFails(as("hsB").doc("students/hsA/renluyen/g2").set(entry)); // 10C5: hsB không có quyền chấm
+  await assertFails(as("hsB").doc("renluyenTong/hsA").set({ [HK]: 9 }, { merge: true }));
+  await assertFails(as("hsB").doc(`students/hsA~${M}/renluyen/e1`).get()); // không đọc được lịch sử chi tiết
+  await assertFails(as("hsC").doc(`students/hsA~${M}/renluyen/g3`).set({ ...entry, nguoiChamUid: "hsC" }));
+});
+
+test("hồ sơ phụ: học sinh không tự ghi được; config chỉ admin ghi", async () => {
+  await assertFails(as("hsA").doc(`roster/hsA~${M}`).set({ fullName: "x", classId: M, authUid: "hsA" }));
+  await assertFails(as("hsA").doc(`students/hsA~${M}`).set({ scores: [{ label: "x", value: "10" }] }));
+  await assertFails(as("hsA").doc(`config/renluyen_${M}`).set({ nguoiDuocCham: ["hsA"] }));
+  await assertSucceeds(as(ADMIN_UID).doc(`config/renluyen_${M}`).set({ hocKyHienTai: HK, nguoiDuocCham: ["hsB"], nutNhanh: [] }));
 });

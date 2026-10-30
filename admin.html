@@ -101,6 +101,30 @@
             <!-- ===== HỌC SINH & LỚP HỌC — Thêm học sinh ===== -->
             <div class="admin-section" data-section="them-hoc-sinh" hidden>
 
+              <!-- Ghép học sinh có sẵn vào lớp thứ hai (dùng chung tài khoản) -->
+              <div class="panel">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">🔗 Thêm danh sách vào lớp — dùng lại tài khoản có sẵn</h3>
+                <p style="color:var(--muted);font-size:0.85rem;margin:0 0 14px;">Em đã có tài khoản ở lớp nguồn sẽ được thêm vào lớp mới bằng chính tài khoản đó (điểm số, nhận xét, điểm rèn luyện của lớp mới tách riêng). Em chưa có tài khoản sẽ được tạo mới (mật khẩu 123abc).</p>
+                <div class="admin-row">
+                  <div class="field"><label>Thêm vào lớp</label><select id="link-target-class"></select></div>
+                  <div class="field"><label>Tìm tài khoản có sẵn ở lớp</label><select id="link-source-class"></select></div>
+                </div>
+                <div class="field">
+                  <label>Danh sách họ tên (mỗi dòng một em)</label>
+                  <textarea id="link-names" rows="8" style="width:100%;font-family:inherit;" placeholder="Nguyễn Văn A&#10;Trần Thị B"></textarea>
+                </div>
+                <button class="btn btn-outline btn-small" id="btn-link-check">Kiểm tra danh sách</button>
+                <div id="link-preview" hidden style="margin-top:14px;">
+                  <p id="link-summary" style="margin:0 0 8px;font-weight:700;"></p>
+                  <table class="data-table">
+                    <thead><tr><th>Họ tên</th><th>Kết quả</th></tr></thead>
+                    <tbody id="link-preview-body"></tbody>
+                  </table>
+                  <button class="btn btn-primary btn-small" id="btn-link-confirm" style="margin-top:12px;">Thực hiện</button>
+                </div>
+                <p class="field-error" id="link-status"></p>
+              </div>
+
               <!-- Thêm 1 học sinh -->
               <div class="panel">
                 <h3 style="margin:0 0 16px;font-size:1.05rem;">➕ Thêm 1 học sinh (lẻ, không theo danh sách)</h3>
@@ -182,9 +206,9 @@
 
                 <div id="student-avatar-list" style="margin-bottom:18px;"></div>
 
-                <!-- Bảng tổng hợp điểm rèn luyện lớp 10C5 (hiện khi chưa chọn học sinh nào) -->
+                <!-- Bảng tổng hợp điểm rèn luyện cả lớp (hiện khi chưa chọn học sinh nào) -->
                 <div id="renluyen-bang-tong" hidden style="margin-bottom:24px;">
-                  <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện lớp 10C5 — <span id="renluyen-bt-hocky" class="mono"></span></h3>
+                  <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện lớp <span id="renluyen-bt-class"></span> — <span id="renluyen-bt-hocky" class="mono"></span></h3>
                   <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Bấm vào một dòng để mở chi tiết và chấm điểm học sinh đó. "Thay đổi trong tuần" tính từ 00:00 thứ Hai (giờ Việt Nam).</p>
                   <div class="admin-row" style="align-items:flex-end;margin-bottom:8px;">
                     <div class="field" style="flex:1;min-width:180px;"><label for="renluyen-bt-search">Tìm theo tên</label><input type="search" id="renluyen-bt-search" placeholder="Gõ tên (không cần dấu)" autocomplete="off" /></div>
@@ -201,9 +225,9 @@
                   <p class="empty-note" id="renluyen-bt-empty" hidden></p>
                 </div>
 
-                <!-- Điểm rèn luyện (chỉ hiện với học sinh lớp 10C5) -->
+                <!-- Điểm rèn luyện (chỉ hiện với học sinh lớp có rèn luyện) -->
                 <div id="renluyen-panel" hidden style="margin-bottom:24px;padding:18px;border:2px solid var(--pen-red-dark);border-radius:12px;background:var(--paper);">
-                  <button type="button" class="back-link" id="btn-renluyen-back-bt" style="margin-bottom:8px;">← Bảng tổng hợp lớp 10C5</button>
+                  <button type="button" class="back-link" id="btn-renluyen-back-bt" style="margin-bottom:8px;">← Bảng tổng hợp cả lớp</button>
                   <h3 style="margin:0 0 4px;font-size:1.05rem;">🏅 Điểm rèn luyện — <span id="renluyen-hocky-label" class="mono"></span></h3>
                   <div id="renluyen-diem-lon" style="font-size:2.6rem;font-weight:800;line-height:1.1;margin:6px 0 16px;"></div>
 
@@ -359,8 +383,9 @@
             <!-- ===== HỌC SINH & LỚP HỌC — Cài đặt điểm rèn luyện ===== -->
             <div class="admin-section" data-section="cai-dat-renluyen" hidden>
               <div class="panel">
-                <h3 style="margin:0 0 6px;font-size:1.05rem;">⚙️ Cài đặt điểm rèn luyện (lớp 10C5)</h3>
-                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 18px;">Chỉ áp dụng cho lớp 10C5 LQĐ. Điểm ban đầu mỗi học kỳ của mọi học sinh là 0.</p>
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">⚙️ Cài đặt điểm rèn luyện</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 18px;">Mỗi lớp có học kỳ hiện tại, người chấm, nút chấm nhanh và bảng xếp hạng riêng. Điểm ban đầu mỗi học kỳ của mọi học sinh là 0.</p>
+                <div class="field" style="max-width:280px;margin-bottom:18px;"><label>Lớp</label><select id="renluyen-cfg-class"></select></div>
 
                 <h4 style="margin:0 0 10px;font-size:0.92rem;">Học kỳ hiện tại</h4>
                 <div class="admin-row">
@@ -372,7 +397,7 @@
                 <h4 style="margin:26px 0 10px;font-size:0.92rem;">Người được giao quyền chấm điểm</h4>
                 <p style="color:var(--muted);font-size:0.82rem;margin:0 0 12px;">Người trong danh sách này, khi đăng nhập vào Khu vực lớp học, sẽ thấy thêm màn hình chấm điểm rèn luyện đơn giản cho cả lớp.</p>
                 <div class="admin-row">
-                  <div class="field"><label>Chọn học sinh 10C5</label><select id="renluyen-cfg-add-grader"></select></div>
+                  <div class="field"><label>Chọn học sinh của lớp</label><select id="renluyen-cfg-add-grader"></select></div>
                   <button class="btn btn-primary btn-small" id="btn-renluyen-cfg-add-grader">+ Thêm</button>
                 </div>
                 <table class="data-table" id="renluyen-cfg-grader-table">

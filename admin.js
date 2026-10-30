@@ -163,6 +163,8 @@ function populateClassSelects() {
     document.getElementById("export-class"),
     document.getElementById("delete-class"),
     document.getElementById("journal-class"),
+    document.getElementById("link-target-class"),
+    document.getElementById("link-source-class"),
   ];
   selects.forEach((sel) => {
     sel.innerHTML = "";
@@ -173,6 +175,8 @@ function populateClassSelects() {
       sel.appendChild(opt);
     });
   });
+  document.getElementById("link-target-class").value = "tho-2k9-minhan";
+  document.getElementById("link-source-class").value = RENLUYEN_CLASS_ID;
   // Mặc định mở thẳng lớp 10C5 (đổi lớp khác bằng ô "Chọn lớp")
   document.getElementById("pick-class").value = RENLUYEN_CLASS_ID;
   loadStudentPicker(document.getElementById("pick-class").value);
@@ -250,7 +254,7 @@ function loadStudentPicker(classId) {
         pickStudent.appendChild(opt);
       });
       renderStudentAvatarList(students);
-      if (classId === RENLUYEN_CLASS_ID && !pickStudent.value) loadRenLuyenBangTong(students);
+      if (isRenLuyenClass(classId) && !pickStudent.value) loadRenLuyenBangTong(students);
     });
 }
 
@@ -260,7 +264,7 @@ document.getElementById("pick-student").addEventListener("change", (e) => {
   if (!uid) {
     document.getElementById("student-editor").hidden = true;
     document.getElementById("renluyen-panel").hidden = true;
-    if (currentStudentClassId === RENLUYEN_CLASS_ID) loadRenLuyenBangTong(renLuyenBtStudents);
+    if (isRenLuyenClass(currentStudentClassId)) loadRenLuyenBangTong(renLuyenBtStudents);
     return;
   }
   document.getElementById("renluyen-bang-tong").hidden = true;
@@ -289,7 +293,7 @@ function loadStudentEditor(uid) {
       document.getElementById("tuition-fixed-status").textContent = "";
       document.getElementById("student-editor").hidden = false;
 
-      if (currentStudentClassId === RENLUYEN_CLASS_ID) {
+      if (isRenLuyenClass(currentStudentClassId)) {
         document.getElementById("renluyen-panel").hidden = false;
         loadRenLuyenAdminPanel(uid);
       } else {
@@ -542,7 +546,7 @@ function renderStudentAvatarList(students) {
     wrap.appendChild(row);
 
     db.collection("studentAvatars")
-      .doc(s.uid)
+      .doc(authUidOfProfile(s.uid))
       .get()
       .then((doc) => {
         if (doc.exists && doc.data().avatarUrl) {
@@ -574,10 +578,11 @@ async function uploadStudentAvatar(uid, file) {
   statusEl.textContent = "Đang tải lên...";
   try {
     const blob = await compressImageFile(file, 480, 0.8);
-    const ref = storage.ref().child("studentAvatars/" + uid + "/avatar.jpg");
+    const authUid = authUidOfProfile(uid); // ảnh dùng chung cho mọi lớp của cùng một tài khoản
+    const ref = storage.ref().child("studentAvatars/" + authUid + "/avatar.jpg");
     await ref.put(blob);
     const url = await ref.getDownloadURL();
-    await db.collection("studentAvatars").doc(uid).set({
+    await db.collection("studentAvatars").doc(authUid).set({
       avatarUrl: url,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -1005,8 +1010,8 @@ document.getElementById("btn-export-excel").addEventListener("click", () => {
         return null;
       }
 
-      if (classId === RENLUYEN_CLASS_ID) {
-        return exportRenLuyenVaHocTapExcel(students, className, statusEl);
+      if (isRenLuyenClass(classId)) {
+        return exportRenLuyenVaHocTapExcel(students, className, statusEl, classId);
       }
       return exportDiemVaNhanXetExcel(students, className, statusEl);
     })
@@ -1016,7 +1021,7 @@ document.getElementById("btn-export-excel").addEventListener("click", () => {
     });
 });
 
-// Xuất Excel như cũ (2 sheet: Điểm số, Nhận xét) — dùng cho MỌI lớp trừ 10C5.
+// Xuất Excel như cũ (2 sheet: Điểm số, Nhận xét) — dùng cho MỌI lớp không có điểm rèn luyện.
 function exportDiemVaNhanXetExcel(students, className, statusEl) {
   return Promise.all(students.map((s) => db.collection("students").doc(s.uid).get())).then((studentDocs) => {
     const scoreRows = [];
@@ -1053,10 +1058,10 @@ function exportDiemVaNhanXetExcel(students, className, statusEl) {
   });
 }
 
-// Xuất Excel riêng cho lớp 10C5 — 2 sheet: "Điểm rèn luyện" (trước) rồi "Điểm học tập"
+// Xuất Excel riêng cho lớp có điểm rèn luyện (10C5, ThoMath MinhAn) — 2 sheet: "Điểm rèn luyện" (trước) rồi "Điểm học tập"
 // (gộp Điểm số + Nhận xét, có cột "Loại" để phân biệt từng dòng).
-function exportRenLuyenVaHocTapExcel(students, className, statusEl) {
-  return getRenLuyenConfig().then((cfg) => {
+function exportRenLuyenVaHocTapExcel(students, className, statusEl, classId) {
+  return getRenLuyenConfig(classId).then((cfg) => {
     const hocKyHienTai = cfg.hocKyHienTai || "";
     const capHocKy = capHocKyTrongNam(hocKyHienTai);
 
@@ -1176,15 +1181,17 @@ function loadDeleteList() {
             <span class="field-error" id="class-role-status-${doc.id}"></span>
           </td>
           <td style="white-space:nowrap;">
-            <button class="mini-btn" data-action="reset" data-uid="${doc.id}">Reset mật khẩu</button>
-            &nbsp;
+            ${doc.id.indexOf(PROFILE_SEP) === -1
+              ? `<button class="mini-btn" data-action="reset" data-uid="${doc.id}">Reset mật khẩu</button>&nbsp;`
+              : `<span style="color:var(--muted);font-size:0.8rem;">Dùng chung tài khoản lớp khác&nbsp;</span>`}
             ${classId === "10c-lqd" ? `<button class="mini-btn" data-action="restore-rl" data-uid="${doc.id}">Khôi phục RL</button>&nbsp;` : ""}
             <button class="mini-btn" data-action="delete-one" data-uid="${doc.id}" style="color:var(--muted);">Xoá</button>
           </td>
         `;
         tr.querySelector(".class-role-select").value = d.classRole || "";
         tr.querySelector(".class-role-select").addEventListener("change", (e) => saveClassRole(doc.id, e.target.value));
-        tr.querySelector('[data-action="reset"]').addEventListener("click", () => resetStudentPassword(doc.id));
+        const resetBtn = tr.querySelector('[data-action="reset"]');
+        if (resetBtn) resetBtn.addEventListener("click", () => resetStudentPassword(doc.id));
         const restoreBtn = tr.querySelector('[data-action="restore-rl"]');
         if (restoreBtn) restoreBtn.addEventListener("click", () => restoreRenLuyenFromOldUid(doc.id));
         tr.querySelector('[data-action="delete-one"]').addEventListener("click", () => {
@@ -1347,18 +1354,21 @@ function resetStudentPassword(oldUid) {
         avatar: avatarDoc.exists ? avatarDoc.data() : null,
       };
       return tryCreateWithFreeCode(baseCode, classId, fullName, studentData, carry).then((res) =>
-        // người được giao quyền chấm điểm rèn luyện: đổi uid cũ -> uid mới trong config
-        db
-          .collection("config")
-          .doc("renluyen")
-          .get()
-          .then((cfg) => {
-            const ds = cfg.exists ? cfg.data().nguoiDuocCham || [] : [];
-            if (ds.indexOf(oldUid) === -1) return;
-            return db.collection("config").doc("renluyen").update({
-              nguoiDuocCham: ds.filter((u) => u !== oldUid).concat([res.uid]),
-            });
-          })
+        // người được giao quyền chấm điểm rèn luyện (mọi lớp): đổi uid cũ -> uid mới trong config
+        Promise.all(
+          RENLUYEN_CLASS_IDS.map((cid) =>
+            renLuyenConfigRef(cid)
+              .get()
+              .then((cfg) => {
+                const ds = cfg.exists ? cfg.data().nguoiDuocCham || [] : [];
+                if (ds.indexOf(oldUid) === -1) return;
+                return renLuyenConfigRef(cid).update({
+                  nguoiDuocCham: ds.filter((u) => u !== oldUid).concat([res.uid]),
+                });
+              })
+          )
+        )
+          .then(() => moveProfilesToNewUid(oldUid, res.uid, res.code))
           .then(() => res.code)
       );
     })
@@ -1381,6 +1391,29 @@ function resetStudentPassword(oldUid) {
       console.error(err);
       statusEl.textContent = "Lỗi khi reset: " + err.message;
     });
+}
+
+// Tài khoản học nhiều lớp: các hồ sơ lớp phụ (roster/<uid cũ>~<lớp>) phải chuyển sang uid mới,
+// kèm điểm số, nhận xét, lượt chấm và tổng điểm rèn luyện của từng lớp đó. Xoá hồ sơ cũ sau khi chép xong.
+async function moveProfilesToNewUid(oldUid, newUid, newCode) {
+  const profiles = await db.collection("roster").where("authUid", "==", oldUid).get();
+  for (const p of profiles.docs) {
+    const data = p.data();
+    const newPid = profileIdFor(newUid, data.classId);
+    const [studentDoc, entries, tongDoc] = await Promise.all([
+      db.collection("students").doc(p.id).get(),
+      db.collection("students").doc(p.id).collection("renluyen").get(),
+      db.collection("renluyenTong").doc(p.id).get(),
+    ]);
+    const writes = [
+      db.collection("roster").doc(newPid).set(Object.assign({}, data, { authUid: newUid, code: newCode })),
+      db.collection("students").doc(newPid).set(studentDoc.exists ? studentDoc.data() : { fullName: data.fullName, classId: data.classId, scores: [], comments: [] }),
+      ...entries.docs.map((e) => db.collection("students").doc(newPid).collection("renluyen").doc(e.id).set(e.data())),
+    ];
+    if (tongDoc.exists) writes.push(db.collection("renluyenTong").doc(newPid).set(tongDoc.data()));
+    await Promise.all(writes);
+    await deleteStudentsByUids([p.id]);
+  }
 }
 
 // Khôi phục điểm rèn luyện cho học sinh đã bị reset mật khẩu trước khi có tính năng tự chép dữ liệu.
@@ -2210,7 +2243,7 @@ function markPhanAnhSeen(id) {
 }
 
 // ==========================================================
-// ĐIỂM RÈN LUYỆN (chỉ áp dụng lớp 10C5) — panel trong "Quản lý danh sách học sinh"
+// ĐIỂM RÈN LUYỆN (các lớp trong RENLUYEN_CLASS_IDS, mỗi lớp tách riêng) — panel trong "Quản lý danh sách học sinh"
 // ==========================================================
 let renLuyenPanelHocKy = "";
 
@@ -2225,7 +2258,7 @@ function loadRenLuyenAdminPanel(uid) {
   document.getElementById("renluyen-history-body").innerHTML = "";
   document.getElementById("renluyen-history-empty").hidden = true;
 
-  getRenLuyenConfig().then((cfg) => {
+  getRenLuyenConfig(currentStudentClassId).then((cfg) => {
     if (uid !== currentStudentUid) return; // đã chuyển sang học sinh khác trong lúc chờ tải
     renLuyenPanelHocKy = cfg.hocKyHienTai;
     document.getElementById("renluyen-hocky-label").textContent = cfg.hocKyHienTai || "(chưa đặt học kỳ hiện tại)";
@@ -2368,7 +2401,20 @@ document.getElementById("btn-renluyen-save").addEventListener("click", () => {
 // ==========================================================
 // CÀI ĐẶT ĐIỂM RÈN LUYỆN — học kỳ hiện tại / người được giao quyền / nút chấm nhanh
 // ==========================================================
+// Lớp đang được cài đặt rèn luyện (ô chọn lớp ở đầu mục Cài đặt điểm rèn luyện)
+function renLuyenCfgClassId() {
+  return document.getElementById("renluyen-cfg-class").value || RENLUYEN_CLASS_ID;
+}
+
 function initRenLuyenSettings() {
+  const classSelect = document.getElementById("renluyen-cfg-class");
+  RENLUYEN_CLASS_IDS.forEach((id) => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = (CLASS_LIST.find((c) => c.id === id) || {}).name || id;
+    classSelect.appendChild(opt);
+  });
+  classSelect.addEventListener("change", loadRenLuyenSettingsPanel);
   loadRenLuyenSettingsPanel();
   document.getElementById("btn-renluyen-cfg-hocky-save").addEventListener("click", saveRenLuyenHocKyHienTai);
   document.getElementById("btn-renluyen-cfg-add-grader").addEventListener("click", addRenLuyenGrader);
@@ -2376,9 +2422,10 @@ function initRenLuyenSettings() {
 }
 
 function loadRenLuyenSettingsPanel() {
-  Promise.all([renLuyenConfigRef().get(), db.collection("roster").where("classId", "==", RENLUYEN_CLASS_ID).orderBy("order").get()]).then(
+  Promise.all([renLuyenConfigRef(renLuyenCfgClassId()).get(), db.collection("roster").where("classId", "==", renLuyenCfgClassId()).orderBy("order").get()]).then(
     ([cfgDoc, rosterSnap]) => {
-      const roster10c5 = rosterSnap.docs.map((d) => ({ uid: d.id, fullName: d.data().fullName }));
+      // nguoiDuocCham lưu uid ĐĂNG NHẬP (không phải id hồ sơ lớp phụ "uid~classId")
+      const roster10c5 = rosterSnap.docs.map((d) => ({ uid: authUidOfProfile(d.id), fullName: d.data().fullName }));
 
       if (!cfgDoc.exists) {
         const defaults = {
@@ -2390,7 +2437,7 @@ function loadRenLuyenSettingsPanel() {
             { label: "Phát biểu tốt", diem: 1 },
           ],
         };
-        renLuyenConfigRef()
+        renLuyenConfigRef(renLuyenCfgClassId())
           .set(defaults)
           .then(() => {
             document.getElementById("renluyen-cfg-hocky").value = "";
@@ -2435,7 +2482,7 @@ function renderRenLuyenGraderTable(graderUids, roster10c5) {
   graderUids.forEach((uid) => {
     const tr = document.createElement("tr");
     const tdName = document.createElement("td");
-    tdName.textContent = byUid[uid] || "(học sinh không còn trong lớp 10C5)";
+    tdName.textContent = byUid[uid] || "(học sinh không còn trong lớp này)";
     const tdBtn = document.createElement("td");
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2474,7 +2521,7 @@ function addRenLuyenGrader() {
     return;
   }
   statusEl.textContent = "Đang lưu...";
-  renLuyenConfigRef()
+  renLuyenConfigRef(renLuyenCfgClassId())
     .set({ nguoiDuocCham: firebase.firestore.FieldValue.arrayUnion(uid) }, { merge: true })
     .then(() => {
       statusEl.textContent = "✓ Đã thêm.";
@@ -2488,7 +2535,7 @@ function addRenLuyenGrader() {
 function removeRenLuyenGrader(uid) {
   const statusEl = document.getElementById("renluyen-cfg-grader-status");
   statusEl.textContent = "Đang lưu...";
-  renLuyenConfigRef()
+  renLuyenConfigRef(renLuyenCfgClassId())
     .set({ nguoiDuocCham: firebase.firestore.FieldValue.arrayRemove(uid) }, { merge: true })
     .then(() => {
       statusEl.textContent = "✓ Đã xoá quyền.";
@@ -2507,7 +2554,7 @@ function saveRenLuyenHocKyHienTai() {
     return;
   }
   statusEl.textContent = "Đang lưu...";
-  renLuyenConfigRef()
+  renLuyenConfigRef(renLuyenCfgClassId())
     .set({ hocKyHienTai: value }, { merge: true })
     .then(() => {
       statusEl.textContent = "✓ Đã lưu.";
@@ -2552,12 +2599,12 @@ function addRenLuyenQuickButton() {
     return;
   }
   statusEl.textContent = "Đang lưu...";
-  renLuyenConfigRef()
+  renLuyenConfigRef(renLuyenCfgClassId())
     .get()
     .then((doc) => {
       const current = doc.exists && Array.isArray(doc.data().nutNhanh) ? doc.data().nutNhanh : [];
       const nutNhanh = current.concat([{ label, diem }]);
-      return renLuyenConfigRef().set({ nutNhanh }, { merge: true });
+      return renLuyenConfigRef(renLuyenCfgClassId()).set({ nutNhanh }, { merge: true });
     })
     .then(() => {
       statusEl.textContent = "✓ Đã thêm.";
@@ -2572,13 +2619,13 @@ function addRenLuyenQuickButton() {
 
 function removeRenLuyenQuickButton(idx) {
   const statusEl = document.getElementById("renluyen-cfg-quick-status");
-  renLuyenConfigRef()
+  renLuyenConfigRef(renLuyenCfgClassId())
     .get()
     .then((doc) => {
       const current = doc.exists && Array.isArray(doc.data().nutNhanh) ? doc.data().nutNhanh : [];
       const nutNhanh = current.slice();
       nutNhanh.splice(idx, 1);
-      return renLuyenConfigRef().set({ nutNhanh }, { merge: true });
+      return renLuyenConfigRef(renLuyenCfgClassId()).set({ nutNhanh }, { merge: true });
     })
     .then(() => loadRenLuyenSettingsPanel())
     .catch((err) => {
@@ -2587,7 +2634,7 @@ function removeRenLuyenQuickButton(idx) {
 }
 
 // ==========================================================
-// BẢNG TỔNG HỢP ĐIỂM RÈN LUYỆN LỚP 10C5 (hiện khi chưa chọn học sinh nào)
+// BẢNG TỔNG HỢP ĐIỂM RÈN LUYỆN CẢ LỚP (hiện khi chưa chọn học sinh nào)
 // ==========================================================
 let renLuyenBtStudents = [];
 let renLuyenBtToken = 0; // bỏ kết quả tải cũ nếu admin đã đổi lớp/chọn học sinh trong lúc chờ
@@ -2623,8 +2670,10 @@ function loadRenLuyenBangTong(students) {
   renLuyenBtRows = [];
   emptyEl.hidden = true;
   document.getElementById("renluyen-bt-hocky").textContent = "";
+  document.getElementById("renluyen-bt-class").textContent =
+    (CLASS_LIST.find((c) => c.id === currentStudentClassId) || {}).name || "";
 
-  getRenLuyenConfig().then((cfg) => {
+  getRenLuyenConfig(currentStudentClassId).then((cfg) => {
     if (token !== renLuyenBtToken) return;
     document.getElementById("renluyen-bt-hocky").textContent = cfg.hocKyHienTai || "";
     if (!cfg.hocKyHienTai) {
@@ -2726,4 +2775,170 @@ document.getElementById("btn-renluyen-back-bt").addEventListener("click", () => 
   const sel = document.getElementById("pick-student");
   sel.value = "";
   sel.dispatchEvent(new Event("change"));
+});
+
+// ==========================================================
+// THÊM DANH SÁCH VÀO LỚP — dùng lại tài khoản có sẵn
+// Em đã có tài khoản ở lớp nguồn: tạo hồ sơ phụ roster/<uid>~<lớp> + students/<uid>~<lớp> (cùng đăng nhập,
+// điểm số / nhận xét / rèn luyện của lớp mới tách riêng). Em chưa có tài khoản: tạo tài khoản mới.
+// ==========================================================
+let linkPlan = [];
+
+function linkCleanName(name) {
+  return String(name || "").replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function linkNameKey(name) {
+  return removeDiacritics(linkCleanName(name)).toLowerCase();
+}
+
+document.getElementById("btn-link-check").addEventListener("click", async () => {
+  const statusEl = document.getElementById("link-status");
+  const target = document.getElementById("link-target-class").value;
+  const source = document.getElementById("link-source-class").value;
+  const previewEl = document.getElementById("link-preview");
+  previewEl.hidden = true;
+  linkPlan = [];
+  if (target === source) {
+    statusEl.textContent = "Lớp nguồn và lớp cần thêm vào phải khác nhau.";
+    return;
+  }
+  const names = document
+    .getElementById("link-names")
+    .value.split(/\r?\n/)
+    .map(linkCleanName)
+    .filter((n) => n.length >= 2);
+  if (!names.length) {
+    statusEl.textContent = "Dán danh sách họ tên (mỗi dòng một em) trước.";
+    return;
+  }
+  statusEl.textContent = "Đang đối chiếu với tài khoản có sẵn...";
+  try {
+    const [srcSnap, tgtSnap] = await Promise.all([
+      db.collection("roster").where("classId", "==", source).get(),
+      db.collection("roster").where("classId", "==", target).get(),
+    ]);
+    const srcByName = new Map();
+    srcSnap.forEach((d) => {
+      const data = d.data();
+      const key = linkNameKey(data.fullName);
+      const item = { uid: data.authUid || d.id, code: data.code, fullName: data.fullName };
+      srcByName.set(key, (srcByName.get(key) || []).concat([item]));
+    });
+    const tgtUids = new Set();
+    const tgtNames = new Set();
+    tgtSnap.forEach((d) => {
+      tgtUids.add(d.data().authUid || d.id);
+      tgtNames.add(linkNameKey(d.data().fullName));
+    });
+
+    const seen = new Set();
+    names.forEach((name) => {
+      const key = linkNameKey(name);
+      if (seen.has(key)) {
+        linkPlan.push({ name, action: "skip", note: "Trùng tên trong danh sách, bỏ qua" });
+        return;
+      }
+      seen.add(key);
+      const found = srcByName.get(key) || [];
+      if (found.length > 1) {
+        linkPlan.push({ name, action: "skip", note: "Lớp nguồn có " + found.length + " em trùng tên — thêm tay" });
+      } else if (found.length === 1) {
+        if (tgtUids.has(found[0].uid)) {
+          linkPlan.push({ name, action: "skip", note: "Đã có trong lớp này" });
+        } else {
+          linkPlan.push({ name, action: "link", uid: found[0].uid, code: found[0].code, fullName: found[0].fullName, note: "Dùng lại tài khoản " + found[0].code });
+        }
+      } else if (tgtNames.has(key)) {
+        linkPlan.push({ name, action: "skip", note: "Đã có em trùng tên trong lớp này" });
+      } else {
+        linkPlan.push({ name, action: "new", note: "Chưa có tài khoản — sẽ tạo mới" });
+      }
+    });
+
+    const count = (a) => linkPlan.filter((p) => p.action === a).length;
+    document.getElementById("link-summary").textContent =
+      "Dùng lại tài khoản: " + count("link") + " · Tạo mới: " + count("new") + " · Bỏ qua: " + count("skip");
+    const body = document.getElementById("link-preview-body");
+    body.innerHTML = "";
+    linkPlan.forEach((p) => {
+      const tr = document.createElement("tr");
+      const tdName = document.createElement("td");
+      tdName.textContent = p.name;
+      const tdNote = document.createElement("td");
+      tdNote.textContent = p.note;
+      if (p.action === "skip") tdNote.style.color = "var(--pen-red)";
+      tr.appendChild(tdName);
+      tr.appendChild(tdNote);
+      body.appendChild(tr);
+    });
+    document.getElementById("btn-link-confirm").disabled = count("link") + count("new") === 0;
+    previewEl.hidden = false;
+    statusEl.textContent = "";
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Lỗi: " + err.message;
+  }
+});
+
+document.getElementById("btn-link-confirm").addEventListener("click", async () => {
+  const statusEl = document.getElementById("link-status");
+  const confirmBtn = document.getElementById("btn-link-confirm");
+  const target = document.getElementById("link-target-class").value;
+  const targetName = (CLASS_LIST.find((c) => c.id === target) || {}).name || target;
+  const todo = linkPlan.filter((p) => p.action === "link" || p.action === "new");
+  if (!todo.length) return;
+  if (!confirm("Thêm " + todo.length + " học sinh vào lớp \"" + targetName + "\"?")) return;
+
+  confirmBtn.disabled = true;
+  const baseOrder = Date.now();
+  const created = [];
+  const failed = [];
+  let linked = 0;
+  for (let i = 0; i < todo.length; i++) {
+    const p = todo[i];
+    statusEl.textContent = "Đang xử lý " + (i + 1) + "/" + todo.length + ": " + p.name + "...";
+    try {
+      if (p.action === "link") {
+        const pid = profileIdFor(p.uid, target);
+        const batch = db.batch();
+        batch.set(db.collection("roster").doc(pid), {
+          fullName: p.fullName,
+          classId: target,
+          code: p.code,
+          authUid: p.uid,
+          order: baseOrder + i,
+        });
+        batch.set(db.collection("students").doc(pid), { fullName: p.fullName, classId: target, scores: [], comments: [] });
+        await batch.commit();
+        linked++;
+      } else {
+        const res = await tryCreateWithFreeCode(
+          target + "-" + (slugifyName(p.name) || "hocsinh"),
+          target,
+          p.name,
+          { scores: [], comments: [] },
+          {}
+        );
+        created.push({ "Họ tên học sinh": p.name, "Mã học sinh": res.code, "Mật khẩu ban đầu": "123abc" });
+      }
+    } catch (err) {
+      console.error(err);
+      failed.push(p.name + " (" + (err.code || err.message) + ")");
+    }
+  }
+
+  if (created.length) {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(created), "Tai khoan");
+    XLSX.writeFile(wb, "TaiKhoan_" + targetName.replace(/\s+/g, "") + "_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+  }
+  statusEl.textContent =
+    "Xong: dùng lại tài khoản " + linked + ", tạo mới " + created.length + "." +
+    (failed.length ? " Lỗi: " + failed.join(", ") : "");
+  linkPlan = [];
+  document.getElementById("link-preview").hidden = true;
+  confirmBtn.disabled = false;
+  loadDeleteList();
+  loadStudentPicker(document.getElementById("pick-class").value);
 });

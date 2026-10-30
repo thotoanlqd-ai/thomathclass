@@ -1,18 +1,46 @@
 // ==== ThoMathClass — renluyen.js ====
-// Hàm dùng chung cho tính năng "Điểm rèn luyện" (chỉ áp dụng lớp 10C5).
+// Hàm dùng chung cho tính năng "Điểm rèn luyện" (áp dụng cho các lớp trong RENLUYEN_CLASS_IDS, mỗi lớp tách riêng).
 // Dùng ở cả admin.html (giáo viên chấm) và lophoc.html (học sinh xem / người được
 // giao quyền chấm nhanh). Yêu cầu: firebase-config.js đã chạy trước (khai báo auth, db).
 
-// PHẢI khớp is10C5() trong firestore.rules và "id" của lớp 10C5 trong CLASS_LIST.
+// Lớp "gốc" của tính năng (10C5 LQĐ) — dùng cấu hình config/renluyen và bảng xếp hạng leaderboard/10C5_<học kỳ>.
+// PHẢI khớp isRenLuyenClass() trong firestore.rules và RENLUYEN_CLASS_IDS trong functions/index.js.
 const RENLUYEN_CLASS_ID = "10c-lqd";
+const RENLUYEN_CLASS_IDS = ["10c-lqd", "tho-2k9-minhan"];
 
-function renLuyenConfigRef() {
-  return db.collection("config").doc("renluyen");
+function isRenLuyenClass(classId) {
+  return RENLUYEN_CLASS_IDS.indexOf(classId) !== -1;
 }
 
-// Đọc config/renluyen. Luôn trả về đủ 3 field kể cả khi tài liệu chưa tồn tại.
-function getRenLuyenConfig() {
-  return renLuyenConfigRef()
+// Một tài khoản đăng nhập có thể học nhiều lớp. Lớp đầu tiên là hồ sơ gốc roster/<uid>;
+// mỗi lớp thêm là một hồ sơ riêng roster/<uid>~<classId> + students/<uid>~<classId> (điểm, nhận xét,
+// điểm rèn luyện tách riêng từng lớp). Hai hàm dưới đổi qua lại giữa uid đăng nhập và id hồ sơ.
+const PROFILE_SEP = "~";
+
+function profileIdFor(uid, classId) {
+  return uid + PROFILE_SEP + classId;
+}
+
+function authUidOfProfile(profileId) {
+  return String(profileId).split(PROFILE_SEP)[0];
+}
+
+// Lớp gốc dùng id cũ ("renluyen", "10C5_<học kỳ>") để dữ liệu đã có không phải chuyển.
+function renLuyenConfigDocId(classId) {
+  return !classId || classId === RENLUYEN_CLASS_ID ? "renluyen" : "renluyen_" + classId;
+}
+
+function renLuyenLeaderboardDocId(classId, hocKy) {
+  return (!classId || classId === RENLUYEN_CLASS_ID ? "10C5" : classId) + "_" + hocKy;
+}
+
+function renLuyenConfigRef(classId) {
+  return db.collection("config").doc(renLuyenConfigDocId(classId));
+}
+
+// Đọc config rèn luyện của lớp. Luôn trả về đủ 3 field kể cả khi tài liệu chưa tồn tại.
+function getRenLuyenConfig(classId) {
+  return renLuyenConfigRef(classId)
     .get()
     .then((doc) => (doc.exists ? doc.data() : {}))
     .then((data) => ({
