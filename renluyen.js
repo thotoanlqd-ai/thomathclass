@@ -25,6 +25,12 @@ function authUidOfProfile(profileId) {
   return String(profileId).split(PROFILE_SEP)[0];
 }
 
+// Tài khoản của giáo viên (tên "ADMIN") được thêm vào mọi lớp để kiểm tra giao diện học sinh —
+// không tính vào sĩ số và xếp hạng. PHẢI khớp khongTinhSiSo() trong functions/index.js.
+function khongTinhSiSo(fullName) {
+  return String(fullName || "").trim().toLowerCase() === "admin";
+}
+
 // Lớp gốc dùng id cũ ("renluyen", "10C5_<học kỳ>") để dữ liệu đã có không phải chuyển.
 function renLuyenConfigDocId(classId) {
   return !classId || classId === RENLUYEN_CLASS_ID ? "renluyen" : "renluyen_" + classId;

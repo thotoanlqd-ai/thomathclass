@@ -3187,6 +3187,7 @@ function refreshClassCounts() {
     .then((snap) => {
       const counts = {};
       snap.forEach((doc) => {
+        if (khongTinhSiSo(doc.data().fullName)) return; // tài khoản ADMIN của giáo viên không tính sĩ số
         const id = doc.data().classId;
         counts[id] = (counts[id] || 0) + 1;
       });
