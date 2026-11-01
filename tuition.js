@@ -13,6 +13,12 @@ const tuitionList = document.getElementById("tuition-list");
 
 let tuitionListUnsub = null;
 let currentTuitionUnsub = null;
+let tuitionItems = []; // các khoản chưa đóng mới nhất từ Firestore (chưa lọc theo lớp đang xem)
+
+// Tên hiển thị của 1 khoản: khoản thu 1 lần (kind = "once") dùng tên khoản thu, còn lại là học phí tháng.
+function tuitionItemLabel(item) {
+  return item.kind === "once" ? item.title || "Khoản thu" : "Học phí tháng " + tuitionMonthLabel(item.month);
+}
 
 function escapeHtmlTuition(str) {
   const div = document.createElement("div");
@@ -39,12 +45,12 @@ function watchTuitionList(uid) {
     .where("studentId", "==", uid)
     .onSnapshot(
       (snap) => {
-        const items = [];
+        tuitionItems = [];
         snap.forEach((doc) => {
           const d = doc.data();
-          if (d.status !== "đã đóng") items.push(Object.assign({ id: doc.id }, d));
+          if (d.status !== "đã đóng") tuitionItems.push(Object.assign({ id: doc.id }, d));
         });
-        renderTuitionList(items);
+        refreshTuitionView();
       },
       (err) => console.error("watchTuitionList lỗi:", err)
     );
@@ -55,7 +61,15 @@ function stopTuitionListWatch() {
     tuitionListUnsub();
     tuitionListUnsub = null;
   }
+  tuitionItems = [];
   if (tuitionSection) tuitionSection.hidden = true;
+}
+
+// Học phí tháng luôn hiện; khoản thu 1 lần chỉ hiện khi học sinh đang xem đúng lớp của khoản đó
+// (tài khoản học nhiều lớp đổi lớp bằng ô chọn lớp — lophoc.js gọi lại hàm này sau mỗi lần đổi).
+function refreshTuitionView() {
+  const viewing = typeof myClassId !== "undefined" ? myClassId : null;
+  renderTuitionList(tuitionItems.filter((it) => it.kind !== "once" || it.classId === viewing));
 }
 
 function renderTuitionList(items) {
@@ -69,7 +83,7 @@ function renderTuitionList(items) {
   tuitionSection.hidden = false;
   tuitionList.innerHTML = "";
   items.forEach((item) => {
-    const label = "Học phí tháng " + tuitionMonthLabel(item.month);
+    const label = tuitionItemLabel(item);
     const noteHtml = item.note
       ? `<br><span style="font-size:0.82rem;color:var(--muted);">${escapeHtmlTuition(item.note)}</span>`
       : "";
@@ -79,7 +93,9 @@ function renderTuitionList(items) {
       "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--card-border);border-radius:10px;margin-bottom:10px;flex-wrap:wrap;";
     row.innerHTML = `
       <span style="font-size:0.92rem;">${escapeHtmlTuition(label)} — ${escapeHtmlTuition(formatVndTuition(item.amount))}${noteHtml}</span>
-      <button class="btn btn-primary btn-small" data-action="pay">Đóng học phí tháng ${escapeHtmlTuition(tuitionMonthLabel(item.month))}</button>
+      <button class="btn btn-primary btn-small" data-action="pay">${
+        item.kind === "once" ? "Đóng khoản này" : "Đóng học phí tháng " + escapeHtmlTuition(tuitionMonthLabel(item.month))
+      }</button>
     `;
     row.querySelector('[data-action="pay"]').addEventListener("click", () => openTuitionPayment(item));
     tuitionList.appendChild(row);
@@ -111,7 +127,7 @@ function closeTuitionModal() {
 }
 
 function openTuitionPayment(item) {
-  document.getElementById("tuition-product-name").textContent = "Học phí tháng " + tuitionMonthLabel(item.month);
+  document.getElementById("tuition-product-name").textContent = tuitionItemLabel(item);
   document.getElementById("tuition-amount").textContent = formatVndTuition(item.amount);
   document.getElementById("tuition-note").textContent = item.note || "";
   openTuitionModal();
@@ -190,22 +206,13 @@ if (tuitionModal) {
   });
 }
 
-// ---------- Khởi động: chỉ theo dõi học phí nếu học sinh thuộc 1 trong 3 lớp học phí ----------
+// ---------- Khởi động: theo dõi mọi khoản của tài khoản đang đăng nhập ----------
+// Chỉ học sinh 3 lớp học phí và lớp 10C5 (khoản thu 1 lần) mới có bản ghi trong collection tuition,
+// nên tài khoản khác tự nhiên không thấy gì.
 auth.onAuthStateChanged((user) => {
   if (!user) {
     stopTuitionListWatch();
     return;
   }
-  db.collection("students")
-    .doc(user.uid)
-    .get()
-    .then((doc) => {
-      const classId = doc.exists ? doc.data().classId : null;
-      if (TUITION_CLASS_IDS.indexOf(classId) !== -1) {
-        watchTuitionList(user.uid);
-      } else {
-        stopTuitionListWatch();
-      }
-    })
-    .catch((err) => console.error(err));
+  watchTuitionList(user.uid);
 });

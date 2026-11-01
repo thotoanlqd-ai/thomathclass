@@ -189,6 +189,7 @@ function showDashboardFor(user, rosterData) {
       const d = doc.data();
       activeProfileId = rosterData.id;
       myClassId = d.classId;
+      if (typeof refreshTuitionView === "function") refreshTuitionView(); // khoản thu 1 lần chỉ hiện ở đúng lớp đang xem
       myClassRole = rosterData.classRole || null;
       myFullName = d.fullName;
 

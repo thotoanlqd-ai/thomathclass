@@ -253,6 +253,20 @@ exports.claimProduct = onCall(
   }
 );
 
+// Nội dung chuyển khoản payOS (tối đa 25 ký tự, bỏ dấu cho ngân hàng đọc được).
+// Khoản thu 1 lần (kind = "once") dùng tên khoản thu; học phí tháng dùng "HP yyyy-MM".
+function tuitionPaymentDescription(tuition) {
+  if (tuition.kind === "once" && tuition.title) {
+    const ascii = String(tuition.title)
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+    return ("TT " + ascii).slice(0, 25);
+  }
+  return ("HP " + tuition.month).slice(0, 25);
+}
+
 // ---------------------------------------------------------
 // createTuitionPayment — gọi từ tuition.js khi phụ huynh/học sinh bấm "Đóng học phí"
 // ---------------------------------------------------------
@@ -292,7 +306,7 @@ async function runCreateTuitionPayment(uid, tuitionDocId, returnUrl, cancelUrl) 
     paymentLink = await payos.createPaymentLink({
       orderCode,
       amount: Number(tuition.amount) || DEFAULT_TUITION_AMOUNT,
-      description: ("HP " + tuition.month).slice(0, 25),
+      description: tuitionPaymentDescription(tuition),
       returnUrl: finalReturnUrl,
       cancelUrl: finalCancelUrl,
     });

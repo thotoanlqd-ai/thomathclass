@@ -486,6 +486,39 @@
                 </div>
                 <p class="empty-note" id="tuition-table-empty" hidden>Lớp này chưa có bản ghi học phí nào.</p>
               </div>
+
+              <div class="panel" style="margin-top:20px;">
+                <h3 style="margin:0 0 6px;font-size:1.05rem;">🧾 Khoản thu một lần — 10C5 LQĐ</h3>
+                <p style="color:var(--muted);font-size:0.88rem;margin:0 0 16px;">Tạo khoản thu riêng (quỹ lớp, đồng phục...) cho học sinh lớp 10C5. Học sinh thấy nhắc đóng + QR payOS ở khu vực lớp 10C5 cho đến khi đóng. Mỗi em có thể nhập số tiền riêng (để trống = số chung, 0 = miễn).</p>
+
+                <div style="border:1px solid var(--card-border);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+                  <div class="admin-row">
+                    <div class="field" style="flex:1;min-width:200px;"><label>Tên khoản thu</label><input type="text" id="once-title" maxlength="60" placeholder="Vd: Quỹ lớp học kỳ 1" /></div>
+                    <div class="field" style="max-width:170px;"><label>Số tiền chung (VNĐ)</label><input type="number" id="once-amount" min="0" step="1000" placeholder="Vd: 150000" /></div>
+                    <div class="field" style="flex:1;min-width:200px;"><label>Ghi chú hiện cho học sinh (tuỳ chọn)</label><input type="text" id="once-note" placeholder="Vd: Mua quà 20/11" /></div>
+                  </div>
+                  <details style="margin:10px 0;">
+                    <summary style="cursor:pointer;font-size:0.88rem;">Số tiền riêng từng học sinh (miễn / giảm)</summary>
+                    <div style="overflow-x:auto;margin-top:8px;">
+                      <table class="data-table">
+                        <thead><tr><th>Học sinh</th><th>Số tiền riêng</th></tr></thead>
+                        <tbody id="once-student-body"></tbody>
+                      </table>
+                    </div>
+                  </details>
+                  <button class="btn btn-primary btn-small" id="btn-once-create">Tạo khoản thu cho cả lớp</button>
+                  <p class="field-error" id="once-create-status"></p>
+                </div>
+
+                <div id="once-summary" style="margin:16px 0;font-size:0.9rem;color:var(--muted);"></div>
+                <div style="overflow-x:auto;">
+                  <table class="data-table">
+                    <thead><tr id="once-table-head"><th>Học sinh</th></tr></thead>
+                    <tbody id="once-table-body"></tbody>
+                  </table>
+                </div>
+                <p class="empty-note" id="once-table-empty" hidden>Lớp 10C5 chưa có khoản thu một lần nào.</p>
+              </div>
             </div>
 
             <!-- ===== THÀNH VIÊN & THANH TOÁN — Quản lý nội dung đăng bán ===== -->
@@ -575,6 +608,13 @@
           <div class="field">
             <label for="tuition-manual-note">Ghi chú (vd: tiền mặt, chuyển khoản tay...)</label>
             <input type="text" id="tuition-manual-note" placeholder="Vd: Tiền mặt" />
+          </div>
+          <div class="field" id="tuition-manual-amount-wrap" hidden>
+            <label for="tuition-manual-amount">Đổi số tiền (VNĐ, 0 = miễn)</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="number" id="tuition-manual-amount" min="0" step="1000" />
+              <button class="btn btn-outline btn-small" id="btn-tuition-manual-amount">Lưu số tiền</button>
+            </div>
           </div>
           <p class="field-error" id="tuition-manual-error"></p>
           <div class="modal-actions">

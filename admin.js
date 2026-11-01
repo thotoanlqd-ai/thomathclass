@@ -1863,6 +1863,7 @@ function initTuitionPanel() {
     opt.textContent = c.name;
     bulkClassEl.appendChild(opt);
   });
+  initOnceFeePanel();
 }
 
 // Đổi số tiền cho mọi khoản chưa đóng của 1 tháng (3 lớp). Học sinh có fixedTuitionAmount = 0
@@ -2106,9 +2107,12 @@ function loadTuitionTable(classId) {
     });
 }
 
-function openTuitionManualModal(tuitionDocId, studentName, month) {
+function openTuitionManualModal(tuitionDocId, studentName, month, onceRec) {
   tuitionManualTarget = tuitionDocId;
-  document.getElementById("tuition-manual-title").textContent = studentName + " — tháng " + tuitionMonthLabelAdmin(month);
+  document.getElementById("tuition-manual-title").textContent =
+    studentName + " — " + (onceRec ? onceRec.title : "tháng " + tuitionMonthLabelAdmin(month));
+  document.getElementById("tuition-manual-amount-wrap").hidden = !onceRec;
+  document.getElementById("tuition-manual-amount").value = onceRec ? onceRec.amount : "";
   document.getElementById("tuition-manual-note").value = "";
   document.getElementById("tuition-manual-error").textContent = "";
   document.getElementById("tuition-manual-modal").classList.add("open");
@@ -2135,11 +2139,236 @@ document.getElementById("btn-tuition-manual-confirm").addEventListener("click", 
       document.getElementById("tuition-manual-modal").classList.remove("open");
       tuitionManualTarget = null;
       loadTuitionTable(currentTuitionClassId);
+      loadOnceFeeTable();
     })
     .catch((err) => {
       errorEl.textContent = "Lỗi: " + err.message;
     });
 });
+
+// Đổi số tiền 1 khoản thu một lần chưa đóng. QR cũ cho hết hạn để lần bấm đóng sau tạo QR đúng số tiền mới;
+// số tiền 0 = miễn (ghi luôn đã đóng).
+document.getElementById("btn-tuition-manual-amount").addEventListener("click", () => {
+  if (!tuitionManualTarget) return;
+  const errorEl = document.getElementById("tuition-manual-error");
+  const raw = document.getElementById("tuition-manual-amount").value.trim();
+  if (raw === "" || isNaN(Number(raw)) || Number(raw) < 0) {
+    errorEl.textContent = "Số tiền phải là số không âm.";
+    return;
+  }
+  const amount = Number(raw);
+  const update =
+    amount === 0
+      ? {
+          amount: 0,
+          status: "đã đóng",
+          paidAt: firebase.firestore.FieldValue.serverTimestamp(),
+          paidMethod: "free",
+          paidNote: "Miễn",
+          qrExpiredAt: null,
+        }
+      : { amount, qrExpiredAt: null };
+  errorEl.textContent = "Đang lưu...";
+  db.collection("tuition")
+    .doc(tuitionManualTarget)
+    .update(update)
+    .then(() => {
+      document.getElementById("tuition-manual-modal").classList.remove("open");
+      tuitionManualTarget = null;
+      loadOnceFeeTable();
+    })
+    .catch((err) => {
+      errorEl.textContent = "Lỗi: " + err.message;
+    });
+});
+
+// ==========================================================
+// KHOẢN THU MỘT LẦN — chỉ lớp 10C5 LQĐ. Dùng chung collection tuition (QR payOS + webhook như học phí tháng):
+// id tuition/<uid đăng nhập>_<feeId>, kind = "once", title = tên khoản thu. Học sinh học nhiều lớp
+// chỉ thấy nhắc khi đang xem lớp 10C5 (xem tuition.js).
+// ==========================================================
+const ONCE_FEE_CLASS_ID = "10c-lqd";
+let onceFeeStudents = []; // [{uid (tài khoản đăng nhập), fullName}]
+
+function initOnceFeePanel() {
+  db.collection("roster")
+    .where("classId", "==", ONCE_FEE_CLASS_ID)
+    .orderBy("order")
+    .get()
+    .then((snap) => {
+      onceFeeStudents = snap.docs.map((d) => ({ uid: authUidOfProfile(d.id), fullName: d.data().fullName || d.id }));
+      const body = document.getElementById("once-student-body");
+      body.innerHTML = "";
+      onceFeeStudents.forEach((s) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${escapeHtml(s.fullName)}</td><td><input type="number" min="0" step="1000" data-uid="${escapeHtml(s.uid)}" style="width:130px;" placeholder="theo số chung" /></td>`;
+        body.appendChild(tr);
+      });
+      loadOnceFeeTable();
+    })
+    .catch((err) => {
+      console.error(err);
+      document.getElementById("once-summary").textContent = "Không tải được danh sách lớp: " + err.message;
+    });
+}
+
+document.getElementById("btn-once-create").addEventListener("click", () => {
+  const statusEl = document.getElementById("once-create-status");
+  const title = document.getElementById("once-title").value.trim();
+  const rawAmount = document.getElementById("once-amount").value.trim();
+  const note = document.getElementById("once-note").value.trim();
+  if (!title) {
+    statusEl.textContent = "Nhập tên khoản thu.";
+    return;
+  }
+  if (rawAmount === "" || isNaN(Number(rawAmount)) || Number(rawAmount) < 0) {
+    statusEl.textContent = "Số tiền chung phải là số không âm.";
+    return;
+  }
+  if (!onceFeeStudents.length) {
+    statusEl.textContent = "Lớp 10C5 chưa có học sinh.";
+    return;
+  }
+  const defaultAmount = Number(rawAmount);
+  const amounts = {};
+  let invalid = false;
+  document.querySelectorAll("#once-student-body input[data-uid]").forEach((inp) => {
+    const raw = inp.value.trim();
+    if (raw === "") return;
+    if (isNaN(Number(raw)) || Number(raw) < 0) invalid = true;
+    else amounts[inp.dataset.uid] = Number(raw);
+  });
+  if (invalid) {
+    statusEl.textContent = "Số tiền riêng phải là số không âm.";
+    return;
+  }
+  if (!confirm(`Tạo khoản thu "${title}" (${defaultAmount.toLocaleString("vi-VN")}đ) cho ${onceFeeStudents.length} học sinh 10C5?`)) return;
+
+  const feeId = "once-" + Date.now();
+  const month = currentMonthKeyAdmin();
+  statusEl.textContent = "Đang tạo...";
+  const batch = db.batch();
+  let freeCount = 0;
+  onceFeeStudents.forEach((s) => {
+    const amount = Object.prototype.hasOwnProperty.call(amounts, s.uid) ? amounts[s.uid] : defaultAmount;
+    const isFree = amount === 0;
+    if (isFree) freeCount++;
+    batch.set(db.collection("tuition").doc(`${s.uid}_${feeId}`), {
+      classId: ONCE_FEE_CLASS_ID,
+      studentId: s.uid,
+      month,
+      kind: "once",
+      feeId,
+      title,
+      amount,
+      status: isFree ? "đã đóng" : "chưa đóng",
+      note: note || null,
+      currentOrderCode: null,
+      currentQrCode: null,
+      currentCheckoutUrl: null,
+      qrExpiredAt: null,
+      paidAt: isFree ? firebase.firestore.FieldValue.serverTimestamp() : null,
+      paidMethod: isFree ? "free" : null,
+      paidOrderCode: null,
+      paidNote: isFree ? "Miễn" : null,
+      possibleDuplicate: false,
+      duplicatePayments: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  batch
+    .commit()
+    .then(() => {
+      statusEl.textContent = `✓ Đã tạo khoản thu cho ${onceFeeStudents.length} học sinh` + (freeCount ? ` (${freeCount} em miễn).` : ".");
+      document.getElementById("once-title").value = "";
+      document.getElementById("once-amount").value = "";
+      document.getElementById("once-note").value = "";
+      document.querySelectorAll("#once-student-body input[data-uid]").forEach((inp) => (inp.value = ""));
+      loadOnceFeeTable();
+    })
+    .catch((err) => {
+      console.error(err);
+      statusEl.textContent = "Lỗi: " + err.message;
+    });
+});
+
+function loadOnceFeeTable() {
+  const summaryEl = document.getElementById("once-summary");
+  const headRow = document.getElementById("once-table-head");
+  const body = document.getElementById("once-table-body");
+  const emptyNote = document.getElementById("once-table-empty");
+  body.innerHTML = "";
+  emptyNote.hidden = true;
+
+  db.collection("tuition")
+    .where("classId", "==", ONCE_FEE_CLASS_ID)
+    .get()
+    .then((snap) => {
+      const fees = {}; // feeId -> {title, paid, unpaid, collected}
+      const byStudent = {}; // uid -> feeId -> {id, ...data}
+      snap.forEach((doc) => {
+        const d = doc.data();
+        if (d.kind !== "once") return;
+        fees[d.feeId] = fees[d.feeId] || { title: d.title, paid: 0, unpaid: 0, collected: 0 };
+        if (d.status === "đã đóng") {
+          fees[d.feeId].paid++;
+          fees[d.feeId].collected += Number(d.amount || 0);
+        } else {
+          fees[d.feeId].unpaid++;
+        }
+        byStudent[d.studentId] = byStudent[d.studentId] || {};
+        byStudent[d.studentId][d.feeId] = Object.assign({ id: doc.id }, d);
+      });
+      const feeIds = Object.keys(fees).sort();
+      if (!feeIds.length) {
+        emptyNote.hidden = false;
+        summaryEl.textContent = "";
+        headRow.innerHTML = "<th>Học sinh</th>";
+        return;
+      }
+      headRow.innerHTML = "<th>Học sinh</th>" + feeIds.map((f) => `<th>${escapeHtml(fees[f].title)}</th>`).join("");
+      summaryEl.innerHTML = feeIds
+        .map(
+          (f) =>
+            `${escapeHtml(fees[f].title)}: <strong>${fees[f].paid}</strong> đã đóng / <strong>${fees[f].unpaid}</strong> chưa đóng — đã thu <strong>${escapeHtml(
+              fees[f].collected.toLocaleString("vi-VN")
+            )}đ</strong>`
+        )
+        .join("<br>");
+
+      onceFeeStudents.forEach((s) => {
+        const tr = document.createElement("tr");
+        let rowHtml = `<td>${escapeHtml(s.fullName)}</td>`;
+        feeIds.forEach((f) => {
+          const rec = (byStudent[s.uid] || {})[f];
+          if (!rec) {
+            rowHtml += `<td style="text-align:center;color:var(--muted);">—</td>`;
+          } else if (rec.status === "đã đóng") {
+            const warn = rec.possibleDuplicate ? ' <span title="Có thể nhận trùng tiền, kiểm tra lại!">⚠️</span>' : "";
+            rowHtml += `<td style="text-align:center;color:var(--chalk);">${rec.paidMethod === "free" ? "miễn" : "✓"}${warn}</td>`;
+          } else {
+            rowHtml += `<td style="text-align:center;"><button class="mini-btn" data-uid="${escapeHtml(s.uid)}" data-fee="${escapeHtml(f)}">${escapeHtml(
+              Number(rec.amount || 0).toLocaleString("vi-VN")
+            )}đ — chưa đóng</button></td>`;
+          }
+        });
+        tr.innerHTML = rowHtml;
+        body.appendChild(tr);
+      });
+
+      body.querySelectorAll("button[data-uid]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const rec = (byStudent[btn.dataset.uid] || {})[btn.dataset.fee];
+          const student = onceFeeStudents.find((s) => s.uid === btn.dataset.uid);
+          if (rec) openTuitionManualModal(rec.id, student ? student.fullName : btn.dataset.uid, rec.month, rec);
+        });
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      summaryEl.textContent = "Không tải được: " + err.message;
+    });
+}
 
 // ==========================================================
 // Ý KIẾN PHẢN HỒI — collection phan_anh (form "Phản ánh - Yêu cầu"
