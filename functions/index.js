@@ -471,11 +471,6 @@ function classIdOfRenLuyenConfig(docId) {
   return null;
 }
 
-// Phải khớp khongTinhSiSo() trong renluyen.js
-function khongTinhSiSo(fullName) {
-  return String(fullName || "").trim().toLowerCase() === "admin";
-}
-
 async function rebuildRenLuyenLeaderboard(classId) {
   if (RENLUYEN_CLASS_IDS.indexOf(classId) === -1) return;
   const cfgSnap = await db.collection("config").doc(renLuyenConfigDocId(classId)).get();
@@ -486,25 +481,20 @@ async function rebuildRenLuyenLeaderboard(classId) {
   }
 
   const rosterSnap = await db.collection("roster").where("classId", "==", classId).get();
-  // Tài khoản ADMIN của giáo viên không tính sĩ số / không xếp hạng; xoá hạng cũ nếu còn sót
-  const excluded = rosterSnap.docs.filter((r) => khongTinhSiSo(r.data().fullName));
-  await Promise.all(excluded.map((r) => db.collection("renluyenHang").doc(r.id).delete()));
   const students = await Promise.all(
-    rosterSnap.docs
-      .filter((r) => !khongTinhSiSo(r.data().fullName))
-      .map(async (r) => {
-        const entries = await db
-          .collection("students")
-          .doc(r.id)
-          .collection("renluyen")
-          .where("hocKy", "==", hocKy)
-          .get();
-        return {
-          uid: r.id,
-          ten: r.data().fullName || "",
-          tong: tongDiem(entries.docs.map((e) => e.data()), hocKy),
-        };
-      })
+    rosterSnap.docs.map(async (r) => {
+      const entries = await db
+        .collection("students")
+        .doc(r.id)
+        .collection("renluyen")
+        .where("hocKy", "==", hocKy)
+        .get();
+      return {
+        uid: r.id,
+        ten: r.data().fullName || "",
+        tong: tongDiem(entries.docs.map((e) => e.data()), hocKy),
+      };
+    })
   );
 
   const ranked = xepHang(students);
