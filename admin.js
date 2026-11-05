@@ -1370,6 +1370,7 @@ function resetStudentPassword(oldUid) {
           )
         )
           .then(() => moveProfilesToNewUid(oldUid, res.uid, res.code))
+          .then(() => moveTuitionToNewUid(oldUid, res.uid))
           .then(() => res.code)
       );
     })
@@ -1392,6 +1393,19 @@ function resetStudentPassword(oldUid) {
       console.error(err);
       statusEl.textContent = "Lỗi khi reset: " + err.message;
     });
+}
+
+// Học phí / khoản thu 1 lần gắn theo uid đăng nhập (tuition/<uid>_<tháng hoặc feeId>, studentId = uid) —
+// chép sang uid mới (giữ nguyên trạng thái đã đóng, số tiền, QR đang chờ) rồi xoá bản ghi cũ.
+async function moveTuitionToNewUid(oldUid, newUid) {
+  const snap = await db.collection("tuition").where("studentId", "==", oldUid).get();
+  if (snap.empty) return;
+  const batch = db.batch();
+  snap.docs.forEach((d) => {
+    batch.set(db.collection("tuition").doc(newUid + d.id.slice(oldUid.length)), Object.assign({}, d.data(), { studentId: newUid }));
+    batch.delete(d.ref);
+  });
+  await batch.commit();
 }
 
 // Tài khoản học nhiều lớp: các hồ sơ lớp phụ (roster/<uid cũ>~<lớp>) phải chuyển sang uid mới,
@@ -2212,6 +2226,33 @@ function initOnceFeePanel() {
     });
 }
 
+// Bản ghi tuition của 1 học sinh cho 1 khoản thu một lần (số tiền 0 = miễn, ghi luôn đã đóng).
+function onceFeeData(uid, fee) {
+  const isFree = fee.amount === 0;
+  return {
+    classId: ONCE_FEE_CLASS_ID,
+    studentId: uid,
+    month: fee.month,
+    kind: "once",
+    feeId: fee.feeId,
+    title: fee.title,
+    amount: fee.amount,
+    status: isFree ? "đã đóng" : "chưa đóng",
+    note: fee.note || null,
+    currentOrderCode: null,
+    currentQrCode: null,
+    currentCheckoutUrl: null,
+    qrExpiredAt: null,
+    paidAt: isFree ? firebase.firestore.FieldValue.serverTimestamp() : null,
+    paidMethod: isFree ? "free" : null,
+    paidOrderCode: null,
+    paidNote: isFree ? "Miễn" : null,
+    possibleDuplicate: false,
+    duplicatePayments: [],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
 document.getElementById("btn-once-create").addEventListener("click", () => {
   const statusEl = document.getElementById("once-create-status");
   const title = document.getElementById("once-title").value.trim();
@@ -2253,28 +2294,7 @@ document.getElementById("btn-once-create").addEventListener("click", () => {
     const amount = Object.prototype.hasOwnProperty.call(amounts, s.uid) ? amounts[s.uid] : defaultAmount;
     const isFree = amount === 0;
     if (isFree) freeCount++;
-    batch.set(db.collection("tuition").doc(`${s.uid}_${feeId}`), {
-      classId: ONCE_FEE_CLASS_ID,
-      studentId: s.uid,
-      month,
-      kind: "once",
-      feeId,
-      title,
-      amount,
-      status: isFree ? "đã đóng" : "chưa đóng",
-      note: note || null,
-      currentOrderCode: null,
-      currentQrCode: null,
-      currentCheckoutUrl: null,
-      qrExpiredAt: null,
-      paidAt: isFree ? firebase.firestore.FieldValue.serverTimestamp() : null,
-      paidMethod: isFree ? "free" : null,
-      paidOrderCode: null,
-      paidNote: isFree ? "Miễn" : null,
-      possibleDuplicate: false,
-      duplicatePayments: [],
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    batch.set(db.collection("tuition").doc(`${s.uid}_${feeId}`), onceFeeData(s.uid, { feeId, title, amount, note, month }));
   });
   batch
     .commit()
@@ -2309,7 +2329,9 @@ function loadOnceFeeTable() {
       snap.forEach((doc) => {
         const d = doc.data();
         if (d.kind !== "once") return;
-        fees[d.feeId] = fees[d.feeId] || { title: d.title, paid: 0, unpaid: 0, collected: 0 };
+        fees[d.feeId] =
+          fees[d.feeId] ||
+          { feeId: d.feeId, title: d.title, amount: d.amount, note: d.note, month: d.month, paid: 0, unpaid: 0, collected: 0 };
         if (d.status === "đã đóng") {
           fees[d.feeId].paid++;
           fees[d.feeId].collected += Number(d.amount || 0);
@@ -2342,7 +2364,8 @@ function loadOnceFeeTable() {
         feeIds.forEach((f) => {
           const rec = (byStudent[s.uid] || {})[f];
           if (!rec) {
-            rowHtml += `<td style="text-align:center;color:var(--muted);">—</td>`;
+            // chưa có bản ghi (em vào lớp sau khi tạo khoản thu, hoặc bị reset mật khẩu trước khi có tính năng tự chép) — bấm để thêm
+            rowHtml += `<td style="text-align:center;"><button class="mini-btn" data-add-uid="${escapeHtml(s.uid)}" data-add-fee="${escapeHtml(f)}" title="Thêm khoản này cho em">＋ thêm</button></td>`;
           } else if (rec.status === "đã đóng") {
             const warn = rec.possibleDuplicate ? ' <span title="Có thể nhận trùng tiền, kiểm tra lại!">⚠️</span>' : "";
             rowHtml += `<td style="text-align:center;color:var(--chalk);">${rec.paidMethod === "free" ? "miễn" : "✓"}${warn}</td>`;
@@ -2361,6 +2384,25 @@ function loadOnceFeeTable() {
           const rec = (byStudent[btn.dataset.uid] || {})[btn.dataset.fee];
           const student = onceFeeStudents.find((s) => s.uid === btn.dataset.uid);
           if (rec) openTuitionManualModal(rec.id, student ? student.fullName : btn.dataset.uid, rec.month, rec);
+        });
+      });
+
+      body.querySelectorAll("button[data-add-uid]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const fee = fees[btn.dataset.addFee];
+          const student = onceFeeStudents.find((s) => s.uid === btn.dataset.addUid);
+          if (!fee || !student) return;
+          const raw = prompt(`Thêm "${fee.title}" cho ${student.fullName}.\nSố tiền (VNĐ, 0 = miễn):`, fee.amount);
+          if (raw === null) return;
+          if (raw.trim() === "" || isNaN(Number(raw)) || Number(raw) < 0) {
+            alert("Số tiền phải là số không âm.");
+            return;
+          }
+          db.collection("tuition")
+            .doc(`${student.uid}_${fee.feeId}`)
+            .set(onceFeeData(student.uid, Object.assign({}, fee, { amount: Number(raw) })))
+            .then(() => loadOnceFeeTable())
+            .catch((err) => alert("Lỗi: " + err.message));
         });
       });
     })
