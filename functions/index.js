@@ -317,6 +317,9 @@ async function runCreateTuitionPayment(uid, tuitionDocId, returnUrl, cancelUrl) 
 
   await tuitionRef.update({
     currentOrderCode: String(orderCode),
+    // Giữ mọi mã đơn đã phát hành: QR cũ hết hạn (30 phút) hoặc bị admin làm mới vẫn quét trả được,
+    // webhook cần nhận ra thay vì chỉ so với currentOrderCode.
+    orderCodes: admin.firestore.FieldValue.arrayUnion(String(orderCode)),
     currentQrCode: paymentLink.qrCode,
     currentCheckoutUrl: paymentLink.checkoutUrl,
     qrExpiredAt: admin.firestore.Timestamp.fromMillis(now + 30 * 60 * 1000),
@@ -396,11 +399,19 @@ exports.payosWebhook = onRequest(
       }
 
       // Không khớp đơn mua sản phẩm nào — kiểm tra có phải thanh toán học phí không
-      const tuitionQuery = await db
+      let tuitionQuery = await db
         .collection("tuition")
         .where("currentOrderCode", "==", orderCode)
         .limit(1)
         .get();
+      if (tuitionQuery.empty) {
+        // QR cũ (đã được thay bằng QR mới) nhưng người đóng vẫn quét và chuyển thành công
+        tuitionQuery = await db
+          .collection("tuition")
+          .where("orderCodes", "array-contains", orderCode)
+          .limit(1)
+          .get();
+      }
 
       if (tuitionQuery.empty) {
         logger.warn("payosWebhook: không tìm thấy order/tuition tương ứng", orderCode);
