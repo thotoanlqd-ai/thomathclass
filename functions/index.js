@@ -225,6 +225,7 @@ exports.claimProduct = onCall(
         description: ("TMC " + productId).slice(0, 25),
         returnUrl,
         cancelUrl,
+        expiredAt: Math.floor(Date.now() / 1000) + QR_TTL_SECONDS, // link hết hạn thật bên payOS
       });
     } catch (err) {
       logger.error("payOS createPaymentLink lỗi:", err);
@@ -252,6 +253,9 @@ exports.claimProduct = onCall(
     };
   }
 );
+
+// Thời hạn mỗi mã QR/link payOS (giây) — dùng cho cả expiredAt gửi payOS lẫn qrExpiredAt trong Firestore
+const QR_TTL_SECONDS = 30 * 60;
 
 // Nội dung chuyển khoản payOS (tối đa 25 ký tự, bỏ dấu cho ngân hàng đọc được).
 // Khoản thu 1 lần (kind = "once") dùng tên khoản thu; học phí tháng dùng "HP yyyy-MM".
@@ -309,6 +313,7 @@ async function runCreateTuitionPayment(uid, tuitionDocId, returnUrl, cancelUrl) 
       description: tuitionPaymentDescription(tuition),
       returnUrl: finalReturnUrl,
       cancelUrl: finalCancelUrl,
+      expiredAt: Math.floor(now / 1000) + QR_TTL_SECONDS, // link hết hạn thật bên payOS
     });
   } catch (err) {
     logger.error("payOS createPaymentLink (học phí) lỗi:", err);
@@ -322,7 +327,7 @@ async function runCreateTuitionPayment(uid, tuitionDocId, returnUrl, cancelUrl) 
     orderCodes: admin.firestore.FieldValue.arrayUnion(String(orderCode)),
     currentQrCode: paymentLink.qrCode,
     currentCheckoutUrl: paymentLink.checkoutUrl,
-    qrExpiredAt: admin.firestore.Timestamp.fromMillis(now + 30 * 60 * 1000),
+    qrExpiredAt: admin.firestore.Timestamp.fromMillis(now + QR_TTL_SECONDS * 1000),
   });
 
   return {
