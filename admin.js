@@ -424,13 +424,15 @@ function renderScoreTable() {
   const body = document.getElementById("score-data-body");
   body.innerHTML = "";
   const scores = currentStudentData.scores || [];
-  scores.forEach((s, idx) => {
+  // Mới nhất lên đầu (mảng lưu theo thứ tự thêm, nên duyệt ngược; idx vẫn là vị trí thật để xoá đúng)
+  for (let idx = scores.length - 1; idx >= 0; idx--) {
+    const s = scores[idx];
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${escapeHtml(s.label)}</td><td>${escapeHtml(s.date || "")}</td><td>${escapeHtml(String(s.value))}</td>
       <td><button class="mini-btn" data-idx="${idx}">Xoá</button></td>`;
     tr.querySelector(".mini-btn").addEventListener("click", () => deleteScore(idx));
     body.appendChild(tr);
-  });
+  }
 }
 
 document.getElementById("btn-add-score").addEventListener("click", () => {
@@ -472,13 +474,14 @@ function renderCommentTable() {
   const body = document.getElementById("comment-data-body");
   body.innerHTML = "";
   const comments = currentStudentData.comments || [];
-  comments.forEach((c, idx) => {
+  for (let idx = comments.length - 1; idx >= 0; idx--) {
+    const c = comments[idx];
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${escapeHtml(c.date || "")}</td><td>${escapeHtml(c.text)}</td>
       <td><button class="mini-btn" data-idx="${idx}">Xoá</button></td>`;
     tr.querySelector(".mini-btn").addEventListener("click", () => deleteComment(idx));
     body.appendChild(tr);
-  });
+  }
 }
 
 document.getElementById("btn-add-comment").addEventListener("click", () => {
